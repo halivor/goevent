@@ -1,11 +1,5 @@
 package middleware
 
-import (
-	"log"
-
-	cnf "github.com/halivor/frontend/config"
-)
-
 type Middleware interface {
 	Bind(id MwId, q string, a Action, c interface{}) QId
 	Produce(mwid MwId, qid QId, msg interface{}) interface{}
@@ -15,7 +9,6 @@ type Middleware interface {
 type middleware struct {
 	category map[TypeID][]Consume
 	mwers    map[MwId]Mwer
-	*log.Logger
 }
 
 func New() *middleware {
@@ -26,7 +19,6 @@ func New() *middleware {
 	return &middleware{
 		category: make(map[TypeID][]Consume),
 		mwers:    cs,
-		Logger:   cnf.NewLogger("[mw] "),
 	}
 }
 

@@ -1,15 +1,11 @@
 package transfer
 
 import (
-	"log"
-
-	cnf "github.com/halivor/frontend/config"
-	mw "github.com/halivor/frontend/middleware"
+	mw "github.com/halivor/goevent/middleware"
 )
 
 type transfer struct {
 	*mw.MwTmpl
-	*log.Logger
 }
 
 func init() {
@@ -19,6 +15,5 @@ func init() {
 func New() mw.Mwer {
 	return &transfer{
 		MwTmpl: mw.NewTmpl(),
-		Logger: cnf.NewLogger("[transfer] "),
 	}
 }

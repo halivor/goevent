@@ -1,7 +1,7 @@
 package check
 
 import (
-	mw "github.com/halivor/frontend/middleware"
+	mw "github.com/halivor/goevent/middleware"
 )
 
 type check struct {

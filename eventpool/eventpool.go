@@ -3,9 +3,8 @@ package eventpool
 import (
 	"fmt"
 	"log"
+	"os"
 	"syscall"
-
-	cnf "github.com/halivor/frontend/config"
 )
 
 type EventPool interface {
@@ -13,6 +12,13 @@ type EventPool interface {
 	ModEvent(ev Event) error
 	DelEvent(ev Event) error
 }
+
+const (
+	EP_TIMEOUT = 1000 // 1000ms
+
+	MaxEvents = 128
+	MaxConns  = 8 * 1024
+)
 
 type eventpool struct {
 	fd   int
@@ -33,14 +39,14 @@ func newEp(epo *eventpool) (*eventpool, error) {
 		if epo == nil {
 			epo = &eventpool{
 				fd:     fd,
-				ev:     make([]syscall.EpollEvent, cnf.MaxEvents),
-				es:     make(map[int]Event, cnf.MaxConns),
+				ev:     make([]syscall.EpollEvent, MaxEvents),
+				es:     make(map[int]Event, MaxConns),
 				stop:   false,
-				Logger: cnf.NewLogger(fmt.Sprintf("[ep(%d)] ", fd)),
+				Logger: log.New(os.Stderr, fmt.Sprintf("[ep(%d)] ", fd), log.LstdFlags),
 			}
 		} else {
 			epo.fd = fd
-			epo.Logger = cnf.NewLogger(fmt.Sprintf("[ep(%d)] ", fd))
+			epo.Logger = log.New(os.Stderr, fmt.Sprintf("[ep(%d)] ", fd), log.LstdFlags)
 		}
 	default:
 		// EINVAL (epoll_create1()) Invalid value specified in flags.
@@ -127,7 +133,7 @@ func (ep *eventpool) DelEvent(ev Event) error {
 
 func (ep *eventpool) Run() {
 	for !ep.stop {
-		switch n, e := syscall.EpollWait(ep.fd, ep.ev, cnf.EP_TIMEOUT); e {
+		switch n, e := syscall.EpollWait(ep.fd, ep.ev, EP_TIMEOUT); e {
 		case syscall.EINTR:
 		case nil:
 			for i := 0; i < n; i++ {

@@ -1,15 +1,11 @@
 package exists
 
 import (
-	"log"
-
-	cnf "github.com/halivor/frontend/config"
-	mw "github.com/halivor/frontend/middleware"
+	mw "github.com/halivor/goevent/middleware"
 )
 
 type exists struct {
 	*mw.MwTmpl
-	*log.Logger
 }
 
 func init() {
@@ -19,7 +15,6 @@ func init() {
 func New() mw.Mwer {
 	return &exists{
 		MwTmpl: mw.NewTmpl(),
-		Logger: cnf.NewLogger("[exists] "),
 	}
 }
 

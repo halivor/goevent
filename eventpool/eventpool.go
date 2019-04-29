@@ -70,7 +70,7 @@ func (ep *eventpool) AddEvent(ev Event) error {
 		syscall.EPOLL_CTL_ADD,
 		ev.Fd(),
 		&syscall.EpollEvent{
-			Events: ev.Event(),
+			Events: EpsToSys(ev.Event()),
 			Fd:     int32(ev.Fd()),
 		},
 	); e {
@@ -92,7 +92,7 @@ func (ep *eventpool) ModEvent(ev Event) error {
 		syscall.EPOLL_CTL_MOD,
 		ev.Fd(),
 		&syscall.EpollEvent{
-			Events: ev.Event(),
+			Events: EpsToSys(ev.Event()),
 			Fd:     int32(ev.Fd()),
 		},
 	); e {
@@ -115,7 +115,7 @@ func (ep *eventpool) DelEvent(ev Event) error {
 		syscall.EPOLL_CTL_DEL,
 		ev.Fd(),
 		&syscall.EpollEvent{
-			Events: ev.Event(),
+			Events: EpsToSys(ev.Event()),
 			Fd:     int32(ev.Fd()),
 		},
 	); e {
@@ -137,8 +137,7 @@ func (ep *eventpool) Run() {
 		case syscall.EINTR:
 		case nil:
 			for i := 0; i < n; i++ {
-				//ep.Println(event[es[ep.ev[i].Events]])
-				ep.es[int(ep.ev[i].Fd)].CallBack(ep.ev[i].Events)
+				ep.es[int(ep.ev[i].Fd)].CallBack(SysToEps(ep.ev[i].Events))
 			}
 		default:
 			// 理论上不存在，若存在则直接重建

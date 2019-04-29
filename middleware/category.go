@@ -9,6 +9,7 @@ type Mwer interface {
 	Bind(q string, a Action, c interface{}) QId
 	Produce(id QId, message interface{}) interface{}
 	GetQId(q string) QId
+	Release(q string, c interface{})
 }
 
 type Consumer interface {

@@ -1,14 +1,21 @@
 package middleware
 
+import (
+	"log"
+	"os"
+)
+
 type Middleware interface {
 	Bind(id MwId, q string, a Action, c interface{}) QId
 	Produce(mwid MwId, qid QId, msg interface{}) interface{}
 	GetQId(id MwId, q string) QId
+	Release(id MwId, q string, c interface{})
 }
 
 type middleware struct {
 	category map[TypeID][]Consume
 	mwers    map[MwId]Mwer
+	*log.Logger
 }
 
 func New() *middleware {
@@ -19,6 +26,7 @@ func New() *middleware {
 	return &middleware{
 		category: make(map[TypeID][]Consume),
 		mwers:    cs,
+		Logger:   log.New(os.Stderr, "[mw] ", log.LstdFlags|log.Lshortfile),
 	}
 }
 
@@ -38,7 +46,14 @@ func (m *middleware) Bind(mwid MwId, q string, a Action, c interface{}) QId {
 
 func (m *middleware) Produce(id MwId, qid QId, msg interface{}) interface{} {
 	if mw, ok := m.mwers[id]; ok {
+		//m.Println("produce", id, msg)
 		return mw.Produce(qid, msg)
 	}
 	return nil
+}
+
+func (m *middleware) Release(id MwId, q string, c interface{}) {
+	if mw, ok := m.mwers[id]; ok {
+		mw.Release(q, c)
+	}
 }

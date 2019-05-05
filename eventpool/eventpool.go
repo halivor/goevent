@@ -17,7 +17,7 @@ const (
 	EP_TIMEOUT = 1000 // 1000ms
 
 	MaxEvents = 128
-	MaxConns  = 8 * 1024
+	maxConns  = 8 * 1024
 )
 
 type eventpool struct {
@@ -40,7 +40,7 @@ func newEp(epo *eventpool) (*eventpool, error) {
 			epo = &eventpool{
 				fd:     fd,
 				ev:     make([]syscall.EpollEvent, MaxEvents),
-				es:     make(map[int]Event, MaxConns),
+				es:     make(map[int]Event, maxConns),
 				stop:   false,
 				Logger: log.New(os.Stderr, fmt.Sprintf("[ep(%d)] ", fd), log.LstdFlags),
 			}

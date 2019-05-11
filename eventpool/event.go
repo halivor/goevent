@@ -17,6 +17,13 @@ const (
 	EV_END
 )
 
+type Event interface {
+	Fd() int
+	CallBack(ev EP_EVENT)
+	Event() EP_EVENT
+	Release()
+}
+
 var evStr map[EP_EVENT]string = map[EP_EVENT]string{
 	EV_READ:  "in ",
 	EV_WRITE: "out ",
@@ -46,13 +53,6 @@ var esArr [32]int32 = [32]int32{
 	EV_WRITE: syscall.EPOLLOUT,
 	EV_ERROR: syscall.EPOLLERR,
 	EV_EDGE:  syscall.EPOLLET,
-}
-
-type Event interface {
-	Fd() int
-	CallBack(ev EP_EVENT)
-	Event() EP_EVENT
-	Release()
 }
 
 func (t EP_EVENT) String() string {

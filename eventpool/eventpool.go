@@ -5,49 +5,52 @@ import (
 	"log"
 	"os"
 	"syscall"
+	"time"
 )
 
 type EventPool interface {
 	AddEvent(ev Event) error
 	ModEvent(ev Event) error
 	DelEvent(ev Event) error
+	AddTmo(exp Expire)
 }
 
 const (
 	EP_TIMEOUT = 1000 // 1000ms
 
 	MaxEvents = 128
-	maxConns  = 8 * 1024
+	maxConns  = 1024 * 1024
 )
 
 type eventpool struct {
 	fd   int
 	ev   []syscall.EpollEvent // 每次被唤醒，最大处理event数
 	es   map[int]Event        // pool中的event
+	tmo  *minHeap
 	stop bool
 	*log.Logger
 }
 
+// TODO: error => panic
 func New() (*eventpool, error) {
-	return newEp(nil)
+	return new(nil)
 }
 
-func newEp(epo *eventpool) (*eventpool, error) {
+func new(epo *eventpool) (*eventpool, error) {
 	fd, e := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
-	switch e {
-	case nil:
-		if epo == nil {
-			epo = &eventpool{
-				fd:     fd,
-				ev:     make([]syscall.EpollEvent, MaxEvents),
-				es:     make(map[int]Event, maxConns),
-				stop:   false,
-				Logger: log.New(os.Stderr, fmt.Sprintf("[ep(%d)] ", fd), log.LstdFlags),
-			}
-		} else {
-			epo.fd = fd
-			epo.Logger = log.New(os.Stderr, fmt.Sprintf("[ep(%d)] ", fd), log.LstdFlags)
+	switch {
+	case e == nil && epo == nil:
+		epo = &eventpool{
+			fd:     fd,
+			ev:     make([]syscall.EpollEvent, MaxEvents),
+			es:     make(map[int]Event, maxConns),
+			tmo:    newHeap(),
+			stop:   false,
+			Logger: log.New(os.Stderr, fmt.Sprintf("[ep(%d)] ", fd), log.LstdFlags),
 		}
+	case e == nil:
+		epo.fd = fd
+		epo.Logger = log.New(os.Stderr, fmt.Sprintf("[ep(%d)] ", fd), log.LstdFlags)
 	default:
 		// EINVAL (epoll_create1()) Invalid value specified in flags.
 		// EMFILE The per-user limit on the number of epoll instances imposed by
@@ -133,11 +136,22 @@ func (ep *eventpool) DelEvent(ev Event) error {
 
 func (ep *eventpool) Run() {
 	for !ep.stop {
-		switch n, e := syscall.EpollWait(ep.fd, ep.ev, EP_TIMEOUT); e {
+		switch n, e := syscall.EpollWait(ep.fd, ep.ev, ep.tmo.ExpireAfter()); e {
 		case syscall.EINTR:
 		case nil:
+			if n == 0 {
+				now := time.Now().UnixNano() / (1000 * 1000)
+				for ep.tmo.Top() <= now {
+					ep.Println("timeout event")
+					exp := ep.tmo.Pop()
+					if ev, ok := exp.(Event); ok {
+						ev.CallBack(EV_TIMEOUT)
+					}
+				}
+			}
 			for i := 0; i < n; i++ {
-				ep.es[int(ep.ev[i].Fd)].CallBack(SysToEps(ep.ev[i].Events))
+				fd := int(ep.ev[i].Fd)
+				ep.es[fd].CallBack(SysToEps(ep.ev[i].Events))
 			}
 		default:
 			// 理论上不存在，若存在则直接重建
@@ -148,7 +162,7 @@ func (ep *eventpool) Run() {
 			//        than or equal to zero.
 
 			ep.Println("epoll wait error", e)
-			if e := ep.reNew(); e != nil {
+			if e := ep.rebuild(); e != nil {
 				ep.Println("ep run failed,", e)
 				return
 			}
@@ -164,9 +178,9 @@ func (ep *eventpool) Release() {
 }
 
 // TODO: 考虑细节
-func (ep *eventpool) reNew() error {
+func (ep *eventpool) rebuild() error {
 	syscall.Close(ep.fd)
-	if _, e := newEp(ep); e != nil {
+	if _, e := new(ep); e != nil {
 		return e
 	}
 	for _, ev := range ep.es {
@@ -179,4 +193,8 @@ func (ep *eventpool) reNew() error {
 
 func (ep *eventpool) Stop() {
 	ep.stop = true
+}
+
+func (ep *eventpool) AddTmo(exp Expire) {
+	ep.tmo.Push(exp)
 }

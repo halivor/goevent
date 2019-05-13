@@ -11,6 +11,7 @@ import (
 const (
 	BUF_MIN_LEN = 1024
 	BUF_MAX_LEN = 4 * 1024 * 1024
+	memType     = 6
 )
 
 type BufferPool interface {
@@ -18,21 +19,18 @@ type BufferPool interface {
 	Release(buffer []byte)
 }
 
-var arrSize [5]int = [5]int{512, 1024, 2048, 4096, 8192}
-var memCnt map[int]int = map[int]int{
-	512:  8000 * 4,
-	1024: 8000 * 2,
-	2048: 8000,
-	4096: 4000,
-	8192: 2000,
-}
-
 // bufferpool =
-//    512 * 8000 * 4 = 16M
-//   1024 * 8000 * 2 = 16M
-//   2048 * 8000     = 16M
-//   4096 * 4000     = 16M
-//   8192 * 2000     = 16M
+//    128 * 8000 * 8 = 8M
+//    512 * 8000 * 2 = 8M
+//   1024 * 8000 * 1 = 8M
+//   2048 * 4000     = 8M
+//   4096 * 2000     = 8M
+//   8192 * 1000     = 8M
+var memSize [memType]int = [memType]int{128, 512, 1024, 2048, 4096, 8192}
+var memCnt [memType]int = [memType]int{8000 * 8, 8000 * 2, 8000 * 1, 4000, 2000, 1000}
+
+// 考虑array和map性能差距
+// 内存分配应该是一个调用频率极高的模块
 type bufferpool struct {
 	locker   uint32
 	memCache map[int][]unsafe.Pointer
@@ -42,26 +40,24 @@ type bufferpool struct {
 }
 
 var (
-	gpool  [][]byte
-	gslice [][]unsafe.Pointer
+	gpool [][]byte
 )
 
 func init() {
 	gpool = make([][]byte, 128)
-	gslice = make([][]unsafe.Pointer, 0, 128)
 }
 
 func New() *bufferpool {
 	bp := &bufferpool{
 		locker:   0,
 		memCache: make(map[int][]unsafe.Pointer, 128),
-		memSlice: make(map[int][]unsafe.Pointer, 128),
+		memSlice: make(map[int][]unsafe.Pointer, 128), // 可以改
 		memCap:   make(map[int]int),
 		memRef:   make(map[unsafe.Pointer]int, 8192),
 	}
-	for size, num := range memCnt {
-		bp.memSlice[size] = make([]unsafe.Pointer, num*10)
-		bp.allocMemory(size, num)
+	for i, size := range memSize {
+		bp.memSlice[size] = make([]unsafe.Pointer, memCnt[i]*10)
+		bp.allocMemory(size, memCnt[i])
 	}
 	return bp
 }
@@ -110,9 +106,8 @@ func (bp *bufferpool) AllocPointer(length int) (p unsafe.Pointer, e error) {
 	for !atomic.CompareAndSwapUint32(&bp.locker, 0, 1) {
 		runtime.Gosched()
 	}
-	for i := 0; i < len(arrSize); i++ {
-		size := arrSize[i]
-		if length <= size {
+	for i := 0; i < memType; i++ {
+		if size := memSize[i]; length <= size {
 			if mc, ok := bp.memCache[size]; ok {
 				switch {
 				case len(mc) > 1:
@@ -123,8 +118,7 @@ func (bp *bufferpool) AllocPointer(length int) (p unsafe.Pointer, e error) {
 				case len(mc) == 1:
 					p = mc[0]
 					bp.memCache[size] = mc[1:]
-					num := memCnt[size]
-					bp.allocMemory(num, size)
+					bp.allocMemory(memCnt[i], size)
 				default:
 					return nil, os.ErrInvalid
 				}

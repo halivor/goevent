@@ -31,7 +31,6 @@ type eventpool struct {
 	*log.Logger
 }
 
-// TODO: error => panic
 func New() *eventpool {
 	return new(nil)
 }

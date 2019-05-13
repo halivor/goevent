@@ -33,7 +33,6 @@ var memCnt map[int]int = map[int]int{
 //   2048 * 8000     = 16M
 //   4096 * 4000     = 16M
 //   8192 * 2000     = 16M
-// TODO: 增加[]unsafe.Pointer缓存，减少因为slice长度导致的内存分配
 type bufferpool struct {
 	locker   uint32
 	memCache map[int][]unsafe.Pointer

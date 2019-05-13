@@ -32,11 +32,11 @@ type eventpool struct {
 }
 
 // TODO: error => panic
-func New() (*eventpool, error) {
+func New() *eventpool {
 	return new(nil)
 }
 
-func new(epo *eventpool) (*eventpool, error) {
+func new(epo *eventpool) *eventpool {
 	fd, e := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
 	switch {
 	case e == nil && epo == nil:
@@ -61,9 +61,9 @@ func new(epo *eventpool) (*eventpool, error) {
 		// ENFILE The system-wide limit on the total number of open files has
 		//        been reached.
 		// ENOMEM There was insufficient memory to create the kernel object.
-		return nil, e
+		panic(e)
 	}
-	return epo, nil
+	return epo
 }
 
 func (ep *eventpool) AddEvent(ev Event) error {
@@ -177,11 +177,15 @@ func (ep *eventpool) Release() {
 	}
 }
 
-func (ep *eventpool) rebuild() error {
+func (ep *eventpool) rebuild() (e error) {
+	defer func() {
+		if r := recover(); r != nil {
+			ep.Println("rebuild panic", r)
+			e = os.ErrInvalid
+		}
+	}()
 	syscall.Close(ep.fd)
-	if _, e := new(ep); e != nil {
-		return e
-	}
+	new(ep)
 	for _, ev := range ep.es {
 		if e := ep.AddEvent(ev); e != nil {
 			ev.Release()

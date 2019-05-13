@@ -177,7 +177,6 @@ func (ep *eventpool) Release() {
 	}
 }
 
-// TODO: 考虑细节
 func (ep *eventpool) rebuild() error {
 	syscall.Close(ep.fd)
 	if _, e := new(ep); e != nil {

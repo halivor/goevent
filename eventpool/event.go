@@ -40,14 +40,6 @@ var seMap map[int32]EP_EVENT = map[int32]EP_EVENT{
 	syscall.EPOLLET:  EV_EDGE,
 }
 
-// TODO: 改用数组处理
-var esMap map[EP_EVENT]int32 = map[EP_EVENT]int32{
-	EV_READ:  syscall.EPOLLIN,
-	EV_WRITE: syscall.EPOLLOUT,
-	EV_ERROR: syscall.EPOLLERR,
-	EV_EDGE:  syscall.EPOLLET,
-}
-
 var esArr [32]int32 = [32]int32{
 	EV_READ:  syscall.EPOLLIN,
 	EV_WRITE: syscall.EPOLLOUT,
@@ -75,11 +67,6 @@ func EpsToSys(ev EP_EVENT) uint32 {
 			ses |= uint32(v)
 		}
 	}
-	/*for k, v := range esMap {*/
-	//if ev&k != 0 {
-	//ses |= uint32(v)
-	//}
-	/*}*/
 	return ses
 }
 

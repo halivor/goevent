@@ -1,7 +1,7 @@
 package bufferpool
 
 import (
-	"log"
+	_ "log"
 	"os"
 	"runtime"
 	"sync/atomic"
@@ -37,35 +37,64 @@ var memCnt map[int]int = map[int]int{
 type bufferpool struct {
 	locker   uint32
 	memCache map[int][]unsafe.Pointer
+	memSlice map[int][]unsafe.Pointer
+	memCap   map[int]int
 	memRef   map[unsafe.Pointer]int
 }
 
-var gpool [][]byte
+var (
+	gpool  [][]byte
+	gslice [][]unsafe.Pointer
+)
 
 func init() {
 	gpool = make([][]byte, 128)
+	gslice = make([][]unsafe.Pointer, 0, 128)
 }
 
 func New() *bufferpool {
 	bp := &bufferpool{
 		locker:   0,
 		memCache: make(map[int][]unsafe.Pointer, 128),
+		memSlice: make(map[int][]unsafe.Pointer, 128),
+		memCap:   make(map[int]int),
 		memRef:   make(map[unsafe.Pointer]int, 8192),
 	}
 	for size, num := range memCnt {
-		bp.memCache[size] = bp.allocMemory(size, num)
+		bp.memSlice[size] = make([]unsafe.Pointer, num*10)
+		bp.allocMemory(size, num)
 	}
 	return bp
 }
 
-func (bp *bufferpool) allocMemory(size, num int) []unsafe.Pointer {
-	list := make([]unsafe.Pointer, num, num*10)
+func (bp *bufferpool) allocMemory(size, num int) {
 	pool := make([]byte, size*num)
 	gpool = append(gpool, pool)
+
+	var list []unsafe.Pointer
+	mc, ok := bp.memCache[size]
+	switch {
+	case !ok:
+		list = bp.memSlice[size][:num]
+		bp.memCap[size] = num
+	case ok && cap(bp.memSlice[size])-bp.memCap[size] >= num*2:
+		// 理论上mc就为0
+		copy(bp.memSlice[size], mc)
+		list = bp.memSlice[size][len(mc) : len(mc)+num]
+		bp.memCap[size] += num
+	case ok && cap(bp.memSlice[size])-bp.memCap[size] < num*2:
+		// 理论上mc就为0
+		bp.memSlice[size] = make([]unsafe.Pointer, (bp.memCap[size]+num)*2)
+		copy(bp.memSlice[size], mc)
+		list = bp.memSlice[size][len(mc) : len(mc)+num]
+		bp.memCap[size] += num
+	default:
+	}
+	bp.memCache[size] = bp.memSlice[size][:len(mc)+len(list)]
+
 	for pre, cur := 0, 1; cur-1 < num; pre, cur = cur*size, cur+1 {
 		list[cur-1] = unsafe.Pointer(&pool[pre])
 	}
-	return list
 }
 
 func (bp *bufferpool) Alloc(length int) (buf []byte, e error) {
@@ -94,8 +123,9 @@ func (bp *bufferpool) AllocPointer(length int) (p unsafe.Pointer, e error) {
 					return nil, os.ErrInvalid
 				case len(mc) == 1:
 					p = mc[0]
+					bp.memCache[size] = mc[1:]
 					num := memCnt[size]
-					bp.memCache[size] = bp.allocMemory(num, size)
+					bp.allocMemory(num, size)
 				default:
 					return nil, os.ErrInvalid
 				}
@@ -118,14 +148,13 @@ func (bp *bufferpool) ReleasePointer(ptr unsafe.Pointer) {
 		runtime.Gosched()
 	}
 	if size, ok := bp.memRef[ptr]; ok {
-		bp.memCache[size] = append(bp.memCache[size], ptr)
-		if cap(bp.memCache[size])-len(bp.memCache[size]) < 64 {
+		if cap(bp.memCache[size])-len(bp.memCache[size]) == 0 {
 			src := bp.memCache[size]
-			bp.memCache[size] = make([]unsafe.Pointer, len(src), memCnt[size]*10)
-			copy(bp.memCache[size], src)
-			log.Println("src", len(src), cap(src),
-				", dst", len(bp.memCache[size]), cap(bp.memCache[size]))
+			dst := bp.memSlice[size][:len(src)]
+			copy(dst, src)
+			bp.memCache[size] = dst
 		}
+		bp.memCache[size] = append(bp.memCache[size], ptr)
 		delete(bp.memRef, ptr)
 		//log.Println("release", ptr)
 	}

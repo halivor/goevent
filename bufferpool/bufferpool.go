@@ -26,29 +26,26 @@ type BufferPool interface {
 //    2048 * 4000     = 8M
 //    4096 * 2000     = 8M
 //    8192 * 1000     = 8M
-var memSize [MEM_SIZE]int = [MEM_SIZE]int{128, 512, 1024, 2048, 4096, 8192}
-var memCnt [MEM_SIZE]int = [MEM_SIZE]int{8000 * 8, 8000 * 2, 8000 * 1, 4000, 2000, 1000}
-var memSizeIdx map[int]int = map[int]int{ // TODO: 暂时没用，考虑丢弃
-	128: 0, 512: 1, 1024: 2, 2048: 3, 4096: 4, 8192: 5,
-}
+var memSize [MEM_SIZE]int = [MEM_SIZE]int{256, 512, 1024, 2048, 4096, 8192}
+var memCnt [MEM_SIZE]int = [MEM_SIZE]int{8000 * 4, 8000 * 2, 8000 * 1, 4000, 2000, 1000}
 
 /*
  * array / map ~= 30 : 1
- * assignment performace
+ * integer assignment performace
  * num            array    map
  * 1000*1000      385us    11788   us
  * 1000*1000*1000 349899us 11776979us
 **/
-// TODO: 考虑对每个map使用lock，不再使用全局lock
+// TODO: 由于使用了两个锁，可能导致性能的下降，考虑如何将锁合并和优化代码处理流程
 type bufferpool struct {
-	locker        uint32
-	memLocker     [MEM_SIZE]*uint32
 	memCache      [MEM_SIZE][]unsafe.Pointer
+	cacheLocker   [MEM_SIZE]*uint32
 	cFirst, cLast int
 	cEnd          int
 	memSlice      [MEM_SIZE][]unsafe.Pointer
 	memCap        [MEM_SIZE]int
 	memRef        map[unsafe.Pointer]int
+	refLocker     *uint32
 }
 
 var (
@@ -57,15 +54,16 @@ var (
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	gpool = make([][]byte, 128)
+	gpool = make([][]byte, 256)
 }
 
 func New() *bufferpool {
 	bp := &bufferpool{
-		locker: 0,
-		memRef: make(map[unsafe.Pointer]int, 8192),
+		memRef:    make(map[unsafe.Pointer]int, 8192),
+		refLocker: new(uint32),
 	}
 	for idx := 0; idx < MEM_SIZE; idx++ {
+		bp.cacheLocker[idx] = new(uint32)
 		bp.memSlice[idx] = make([]unsafe.Pointer, memCnt[idx]*10)
 		bp.allocMemory(idx)
 	}
@@ -114,12 +112,17 @@ func (bp *bufferpool) Alloc(length int) (buf []byte, e error) {
 }
 
 func (bp *bufferpool) AllocPointer(length int) (p unsafe.Pointer, e error) {
-	defer atomic.StoreUint32(&bp.locker, 0)
-	for !atomic.CompareAndSwapUint32(&bp.locker, 0, 1) {
-		runtime.Gosched()
-	}
 	for idx := 0; idx < MEM_SIZE; idx++ {
 		if length <= memSize[idx] {
+			defer func(idx int) {
+				if e == nil {
+					bp.lockRef()
+					defer bp.unlockRef()
+					bp.memRef[p] = idx
+				}
+			}(idx)
+			bp.lockCache(idx)
+			defer bp.unlockCache(idx)
 			// TODO: 手工处理位置信息与使用slice处理流程性能对比
 			switch mc := bp.memCache[idx]; {
 			case len(mc) > 1:
@@ -135,8 +138,7 @@ func (bp *bufferpool) AllocPointer(length int) (p unsafe.Pointer, e error) {
 				return nil, os.ErrInvalid
 			}
 			//log.Println("alloc  ", p)
-			bp.memRef[p] = idx
-			return p, nil
+			return
 		}
 	}
 	return nil, os.ErrInvalid
@@ -147,14 +149,13 @@ func (bp *bufferpool) Release(buf []byte) {
 }
 
 func (bp *bufferpool) ReleasePointer(ptr unsafe.Pointer) {
-	defer atomic.StoreUint32(&bp.locker, 0)
-	for !atomic.CompareAndSwapUint32(&bp.locker, 0, 1) {
-		runtime.Gosched()
-	}
+	bp.lockRef()
+	defer bp.unlockRef()
 	if idx, ok := bp.memRef[ptr]; ok {
+		bp.lockCache(idx)
+		defer bp.unlockCache(idx)
 		if cap(bp.memCache[idx])-len(bp.memCache[idx]) == 0 {
 			src := bp.memCache[idx]
-			//log.Println()
 			dst := bp.memSlice[idx][:len(src)]
 			copy(dst, src)
 			//log.Println(idx, cap(bp.memSlice[idx]),
@@ -166,4 +167,23 @@ func (bp *bufferpool) ReleasePointer(ptr unsafe.Pointer) {
 		delete(bp.memRef, ptr)
 		//log.Println("release", ptr)
 	}
+}
+
+func (bp *bufferpool) lockCache(idx int) {
+	for !atomic.CompareAndSwapUint32(bp.cacheLocker[idx], 0, 1) {
+		runtime.Gosched()
+	}
+}
+func (bp *bufferpool) unlockCache(idx int) {
+	atomic.StoreUint32(bp.cacheLocker[idx], 0)
+}
+
+func (bp *bufferpool) lockRef() {
+	for !atomic.CompareAndSwapUint32(bp.refLocker, 0, 1) {
+		runtime.Gosched()
+	}
+}
+
+func (bp *bufferpool) unlockRef() {
+	atomic.StoreUint32(bp.refLocker, 0)
 }

@@ -114,13 +114,6 @@ func (bp *bufferpool) Alloc(length int) (buf []byte, e error) {
 func (bp *bufferpool) AllocPointer(length int) (p unsafe.Pointer, e error) {
 	for idx := 0; idx < MEM_SIZE; idx++ {
 		if length <= memSize[idx] {
-			defer func(idx int) {
-				if e == nil {
-					bp.lockRef()
-					defer bp.unlockRef()
-					bp.memRef[p] = idx
-				}
-			}(idx)
 			bp.lockCache(idx)
 			defer bp.unlockCache(idx)
 			// TODO: 手工处理位置信息与使用slice处理流程性能对比
@@ -138,6 +131,9 @@ func (bp *bufferpool) AllocPointer(length int) (p unsafe.Pointer, e error) {
 				return nil, os.ErrInvalid
 			}
 			//log.Println("alloc  ", p)
+			bp.lockRef()
+			bp.memRef[p] = idx
+			bp.unlockRef()
 			return
 		}
 	}
@@ -150,10 +146,13 @@ func (bp *bufferpool) Release(buf []byte) {
 
 func (bp *bufferpool) ReleasePointer(ptr unsafe.Pointer) {
 	bp.lockRef()
-	defer bp.unlockRef()
-	if idx, ok := bp.memRef[ptr]; ok {
+	idx, ok := bp.memRef[ptr]
+	if ok {
+		delete(bp.memRef, ptr)
+	}
+	bp.unlockRef()
+	if ok {
 		bp.lockCache(idx)
-		defer bp.unlockCache(idx)
 		if cap(bp.memCache[idx])-len(bp.memCache[idx]) == 0 {
 			src := bp.memCache[idx]
 			dst := bp.memSlice[idx][:len(src)]
@@ -164,8 +163,8 @@ func (bp *bufferpool) ReleasePointer(ptr unsafe.Pointer) {
 			bp.memCache[idx] = dst
 		}
 		bp.memCache[idx] = append(bp.memCache[idx], ptr)
-		delete(bp.memRef, ptr)
 		//log.Println("release", ptr)
+		bp.unlockCache(idx)
 	}
 }
 

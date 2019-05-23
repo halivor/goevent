@@ -105,6 +105,9 @@ func (bp *bufferpool) allocMemory(idx int) {
 func (bp *bufferpool) Alloc(length int) (buf []byte, e error) {
 	ptr, e := bp.AllocPointer(length)
 	if e != nil {
+		if e == os.ErrNotExist {
+			return make([]byte, length), nil
+		}
 		return nil, e
 	}
 	buf = (*((*[BUF_MAX_LEN]byte)(unsafe.Pointer(ptr))))[:length:length]
@@ -134,10 +137,9 @@ func (bp *bufferpool) AllocPointer(length int) (p unsafe.Pointer, e error) {
 			bp.lockRef()
 			bp.memRef[p] = idx
 			bp.unlockRef()
-			return
 		}
 	}
-	return nil, os.ErrInvalid
+	return nil, os.ErrNotExist
 }
 
 func (bp *bufferpool) Release(buf []byte) {

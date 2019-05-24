@@ -2,12 +2,12 @@ package logger
 
 import (
 	"io"
+	"log"
 	"os"
-	_ "path"
 	"sync"
 	"time"
 
-	bp "github.com/halivor/goutility/bufferpool"
+	bp "git.admin.inyuapp.com/ids/goutility/bufferpool"
 )
 
 const (
@@ -63,6 +63,8 @@ func init() {
 	}
 	mLogs[os.Stdout] = &logList{}
 
+	glog = NewStdOut("", log.Lshortfile|log.Ltime, DEBUG)
+	glog.depth = 3
 	go write()
 }
 

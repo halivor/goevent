@@ -118,21 +118,21 @@ func (bp *bufferpool) AllocPointer(length int) (p unsafe.Pointer, e error) {
 	for idx := 0; idx < MEM_SIZE; idx++ {
 		if length <= memSize[idx] {
 			bp.lockCache(idx)
-			defer bp.unlockCache(idx)
 			// TODO: 手工处理位置信息与使用slice处理流程性能对比
 			switch mc := bp.memCache[idx]; {
 			case len(mc) > 1:
 				p = mc[0]
 				bp.memCache[idx] = mc[1:]
-			case len(mc) == 0:
-				return nil, os.ErrInvalid
 			case len(mc) == 1:
 				p = mc[0]
 				bp.memCache[idx] = mc[1:]
 				bp.allocMemory(idx)
+			//case len(mc) == 0: return nil, os.ErrInvalid
 			default:
+				bp.unlockCache(idx)
 				return nil, os.ErrInvalid
 			}
+			bp.unlockCache(idx)
 			//log.Println("alloc  ", p)
 			bp.lockRef()
 			bp.memRef[p] = idx

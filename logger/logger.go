@@ -31,15 +31,10 @@ type Logger interface {
 	SetLevel(level Level)
 	SetPrefix(prefix string)
 	Trace(v ...interface{})
-	Traceln(v ...interface{})
 	Debug(v ...interface{})
-	Debugln(v ...interface{})
 	Info(v ...interface{})
-	Infoln(v ...interface{})
 	Warn(v ...interface{})
-	Warnln(v ...interface{})
 	Panic(v ...interface{})
-	Panicln(v ...interface{})
 }
 
 var glog *logger
@@ -93,7 +88,7 @@ func SetLevel(level Level) {
 }
 
 func Trace(v ...interface{}) {
-	glog.Traceln(v)
+	glog.Trace(v)
 }
 
 func Debug(v ...interface{}) {
@@ -101,13 +96,13 @@ func Debug(v ...interface{}) {
 }
 
 func Info(v ...interface{}) {
-	glog.Infoln(v)
+	glog.Info(v)
 }
 
 func Warn(v ...interface{}) {
-	glog.Warnln(v)
+	glog.Warn(v)
 }
 
 func Panic(v ...interface{}) {
-	glog.Panicln(v)
+	glog.Panic(v)
 }

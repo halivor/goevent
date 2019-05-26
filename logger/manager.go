@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	bp "git.admin.inyuapp.com/ids/goutility/bufferpool"
+	bp "github.com/halivor/goutility/bufferpool"
 )
 
 const (

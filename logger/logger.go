@@ -31,10 +31,13 @@ type Logger interface {
 	SetLevel(level Level)
 	SetPrefix(prefix string)
 	Trace(v ...interface{})
+	Traceln(v ...interface{})
 	Debug(v ...interface{})
+	Debugln(v ...interface{})
 	Info(v ...interface{})
+	Infoln(v ...interface{})
 	Warn(v ...interface{})
-	Panic(v ...interface{})
+	Warnln(v ...interface{})
 }
 
 var glog *logger
@@ -43,18 +46,17 @@ const (
 	logLen = int(unsafe.Sizeof(logger{}))
 )
 
-func NewFileLog(file string, prefix string, flag int, level Level) (*logger, error) {
-	locker.Lock()
-	l := freeList[0]
-	freeList = freeList[1:]
-	locker.Unlock()
-
-	w, _ := newFile(file)
-	l.level = level
-	l.depth = 2
-	l.Logger = log.New(l, prefix, flag)
-	l.Writer = w
-	log.Println(len(mFile), len(mWriter), len(mLogs))
+func NewFileLog(file string, prefix string, flag int, level Level) (l *logger, e error) {
+	switch l, e = newLogger(file); {
+	case e != nil:
+		log.Panicln(e)
+		return nil, e
+	default:
+		l.level = level
+		l.depth = 2
+		l.Logger = log.New(l, prefix, flag)
+		//log.Println(len(mFnFI), len(mLogs))
+	}
 
 	return l, nil
 }
@@ -73,6 +75,19 @@ func NewStdOut(prefix string, flag int, level Level) *logger {
 }
 
 func Release(l Logger) {
+	locker.Lock()
+	defer locker.Unlock()
+	switch lg, ok := l.(*logger); {
+	case ok && lg.Writer == os.Stdout:
+		lg.Logger = nil
+		lg.FileInfo = nil
+		freeList = append(freeList, lg)
+	case ok:
+		if lgs, ok := mLoggers[lg.Writer]; ok {
+			delete(lgs, lg)
+		}
+	}
+	return
 }
 
 func SetPrefix(prefix string) {
@@ -88,7 +103,7 @@ func SetLevel(level Level) {
 }
 
 func Trace(v ...interface{}) {
-	glog.Trace(v)
+	glog.Traceln(v)
 }
 
 func Debug(v ...interface{}) {
@@ -96,13 +111,9 @@ func Debug(v ...interface{}) {
 }
 
 func Info(v ...interface{}) {
-	glog.Info(v)
+	glog.Infoln(v)
 }
 
 func Warn(v ...interface{}) {
-	glog.Warn(v)
-}
-
-func Panic(v ...interface{}) {
-	glog.Panic(v)
+	glog.Warnln(v)
 }

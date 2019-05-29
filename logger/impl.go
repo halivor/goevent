@@ -14,15 +14,17 @@ type logger struct {
 	level    Level
 	depth    int
 	fileName string
-	FileInfo os.FileInfo
+
+	os.FileInfo
 	*log.Logger
 	io.Writer
 }
 
 func (l *logger) Write(pb []byte) (int, error) {
+	// TODO: memory leak
 	data := bp.Alloc(len(pb))
 	copy(data, pb)
-	chn <- &nlogs{w: l.Writer, data: data}
+	chNl <- &nlogs{w: l.Writer, data: data}
 	return len(pb), nil
 }
 

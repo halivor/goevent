@@ -74,18 +74,40 @@ func NewStdOut(prefix string, flag int, level Level) *logger {
 	return l
 }
 
-func Release(l Logger) {
+func Release(l Logger) { // TODO: 放到 for/select 内部
 	locker.Lock()
 	defer locker.Unlock()
 	switch lg, ok := l.(*logger); {
 	case ok && lg.Writer == os.Stdout:
-		lg.Logger = nil
 		lg.FileInfo = nil
+		lg.Writer = nil
+		lg.Logger = nil
 		freeList = append(freeList, lg)
 	case ok:
 		if lgs, ok := mLoggers[lg.Writer]; ok {
-			delete(lgs, lg)
+			delete(lgs, lg)    // io.writer -> []*logger
+			if len(lgs) == 0 { // io.writer -> close
+				// base name -> []file info -> io.writer
+				if fw, ok := mFnFI[lg.FileInfo.Name()]; ok {
+					delete(fw, lg.FileInfo)
+					if len(fw) == 0 {
+						delete(mFnFI, lg.FileInfo.Name())
+					}
+				}
+				delete(mLoggers, lg.Writer) // io.writer -> logger
+				delete(mFile, lg.Writer)    // io.writer -> file name
+
+				chFlush <- lg.Writer
+				if fp, ok := lg.Writer.(*os.File); ok {
+					fp.Close()
+				}
+			}
 		}
+
+		lg.Logger = nil
+		lg.FileInfo = nil
+		lg.Writer = nil
+		freeList = append(freeList, lg)
 	}
 	return
 }

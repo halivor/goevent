@@ -4,9 +4,7 @@ import (
 	"io"
 	"log"
 	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 	"time"
 
 	bp "github.com/halivor/goutility/bufferpool"
@@ -29,38 +27,33 @@ type nlogs struct {
 	data []byte
 }
 
-// 致命日志
-type elogs struct {
-	w    io.Writer
-	data []byte
-}
-
 var (
 	locker    sync.RWMutex
 	arrLogger [MAX_LOGGERS]logger // 所有logger信息
 	freeList  []*logger
 
-	chn chan *nlogs
-	chw chan *elogs
-	chs chan os.Signal
+	chNl    chan *nlogs
+	chWl    chan *nlogs
+	chFlush chan io.Writer
+	chReLog chan struct{}
 
 	mFnFI    map[string]map[os.FileInfo]io.Writer // 不同位置的同名文件的文件信息
-	mFile    map[io.Writer]string
 	mLoggers map[io.Writer]map[*logger]struct{}
+	mFile    map[io.Writer]string
 
 	mLogs map[io.Writer]*logList // writer到实际日志的映射
 	wSet  map[io.Writer]struct{} // 待写入write
 )
 
 func init() {
-	chn = make(chan *nlogs, 1024)
-	chw = make(chan *elogs, 1024)
-	chs = make(chan os.Signal, 1024)
-	signal.Notify(chs, syscall.SIGUSR1, syscall.SIGUSR2)
+	chNl = make(chan *nlogs, 1024)
+	chWl = make(chan *nlogs, 1024)
+	chFlush = make(chan io.Writer, 1024)
+	chReLog = make(chan struct{}, 1024)
 
 	mFnFI = make(map[string]map[os.FileInfo]io.Writer, 1024) // file name -> file info
 	mFile = make(map[io.Writer]string, 1024)                 // io.Writer -> file name
-	mLoggers = make(map[io.Writer]map[*logger]struct{})
+	mLoggers = make(map[io.Writer]map[*logger]struct{}, 1024)
 
 	mLogs = make(map[io.Writer]*logList)     // write -> log list
 	wSet = make(map[io.Writer]struct{}, 128) // wait to write
@@ -99,30 +92,50 @@ func flush(w io.Writer) {
 	}
 }
 
+func record(nl *nlogs) {
+	wSet[nl.w] = struct{}{}
+	switch l, ok := mLogs[nl.w]; {
+	case ok && l.n+2 < MAX_LOGS:
+		l.list[l.n] = nl
+		l.n++
+	case ok && l.n+2 == MAX_LOGS:
+		l.list[l.n] = nl
+		l.n++
+		flush(nl.w)
+	default:
+		l := &logList{}
+		mLogs[nl.w] = l
+		l.list[l.n] = nl
+		l.n++
+	}
+}
+
 func write() {
-	tn := time.NewTicker(time.Millisecond * 50)
+	tn := time.NewTicker(time.Millisecond * 100)
 	for {
 		select {
 		case <-tn.C:
 			flushAll()
-		case nl, ok := <-chn:
+		case nl, ok := <-chNl:
 			if !ok {
-				chn = nil
+				chNl = make(chan *nlogs, 1024)
 			}
-			wSet[nl.w] = struct{}{}
-			switch l, ok := mLogs[nl.w]; {
-			case ok && l.n+2 < MAX_LOGS:
-				l.list[l.n] = nl
-				l.n++
-			case ok && l.n+2 == MAX_LOGS:
-				l.list[l.n] = nl
-				l.n++
-				flush(nl.w)
+			record(nl)
+		case nl, ok := <-chWl:
+			if !ok {
+				chNl = make(chan *nlogs, 1024)
 			}
-			// 缓存达到量级后清理
-		case <-chw:
-			// 立即清空对应writer的日志
-		case <-chs:
+			record(nl)
+			flush(nl.w)
+		case w, ok := <-chFlush:
+			if !ok {
+				chFlush = make(chan io.Writer, 1024)
+			}
+			flush(w)
+		case _, ok := <-chReLog:
+			if !ok {
+				chReLog = make(chan struct{}, 1024)
+			}
 			// 重写日志
 			flushAll()
 			reLog()
@@ -144,14 +157,16 @@ func newLogger(file string) (lg *logger, e error) {
 		// 文件不存在，直接创建
 		var fp *os.File
 		if fp, e = os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644); e == nil {
-			lg.FileInfo, e = os.Stat(file)
-			mLogs[fp] = &logList{}
+			lg.Writer = fp
+			if lg.FileInfo, e = os.Stat(file); e != nil {
+				return
+			}
 			if _, ok := mFnFI[lg.FileInfo.Name()]; !ok {
 				mFnFI[lg.FileInfo.Name()] = make(map[os.FileInfo]io.Writer, 8)
 			}
 			mFnFI[lg.FileInfo.Name()][lg.FileInfo] = fp
+
 			mFile[fp] = file
-			lg.Writer = fp
 			if _, ok := mLoggers[lg]; !ok {
 				mLoggers[fp] = make(map[*logger]struct{}, 8)
 			}
@@ -163,6 +178,7 @@ func newLogger(file string) (lg *logger, e error) {
 			for efi, w := range efis {
 				if os.SameFile(efi, lg.FileInfo) {
 					lg.Writer = w
+					lg.FileInfo = efi
 					if _, ok := mLoggers[w]; !ok {
 						mLoggers[w] = make(map[*logger]struct{}, 8)
 					}
@@ -174,13 +190,14 @@ func newLogger(file string) (lg *logger, e error) {
 
 		// 若日志文件未打开，直接创建
 		if fp, e := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644); e == nil {
-			mLogs[fp] = &logList{}
+			lg.Writer = fp
+			lg.FileInfo, e = os.Stat(file)
 			if _, ok := mFnFI[lg.FileInfo.Name()]; !ok {
 				mFnFI[lg.FileInfo.Name()] = make(map[os.FileInfo]io.Writer, 8)
 			}
 			mFnFI[lg.FileInfo.Name()][lg.FileInfo] = fp
+
 			mFile[fp] = file
-			lg.Writer = fp
 			if _, ok := mLoggers[lg]; !ok {
 				mLoggers[fp] = make(map[*logger]struct{}, 8)
 			}
@@ -193,6 +210,7 @@ func newLogger(file string) (lg *logger, e error) {
 }
 
 func ReLog() {
+	chReLog <- struct{}{}
 }
 
 func reLog() {

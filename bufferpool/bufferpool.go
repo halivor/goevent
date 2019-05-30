@@ -45,6 +45,7 @@ type bufferpool struct {
 	memSlice      [MEM_SIZE][]unsafe.Pointer
 	memCap        [MEM_SIZE]int
 	memRef        map[unsafe.Pointer]int
+	memBig        map[unsafe.Pointer][]byte
 	refLocker     *uint32
 }
 
@@ -60,6 +61,7 @@ func init() {
 func New() *bufferpool {
 	bp := &bufferpool{
 		memRef:    make(map[unsafe.Pointer]int, 8192),
+		memBig:    make(map[unsafe.Pointer][]byte, 8192),
 		refLocker: new(uint32),
 	}
 	for idx := 0; idx < MEM_SIZE; idx++ {
@@ -105,9 +107,6 @@ func (bp *bufferpool) allocMemory(idx int) {
 func (bp *bufferpool) Alloc(length int) (buf []byte, e error) {
 	ptr, e := bp.AllocPointer(length)
 	if e != nil {
-		if e == os.ErrNotExist {
-			return make([]byte, length), nil
-		}
 		return nil, e
 	}
 	buf = (*((*[BUF_MAX_LEN]byte)(unsafe.Pointer(ptr))))[:length:length]
@@ -127,7 +126,7 @@ func (bp *bufferpool) AllocPointer(length int) (p unsafe.Pointer, e error) {
 				p = mc[0]
 				bp.memCache[idx] = mc[1:]
 				bp.allocMemory(idx)
-			//case len(mc) == 0: return nil, os.ErrInvalid
+			/*case len(mc) == 0: return nil, os.ErrInvalid*/
 			default:
 				bp.unlockCache(idx)
 				return nil, os.ErrInvalid
@@ -137,9 +136,15 @@ func (bp *bufferpool) AllocPointer(length int) (p unsafe.Pointer, e error) {
 			bp.lockRef()
 			bp.memRef[p] = idx
 			bp.unlockRef()
+			return p, nil
 		}
 	}
-	return nil, os.ErrNotExist
+	bp.lockRef()
+	buf := make([]byte, length)
+	ptr := unsafe.Pointer(&buf[0])
+	bp.memBig[ptr] = buf
+	bp.unlockRef()
+	return ptr, nil
 }
 
 func (bp *bufferpool) Release(buf []byte) {
@@ -149,8 +154,11 @@ func (bp *bufferpool) Release(buf []byte) {
 func (bp *bufferpool) ReleasePointer(ptr unsafe.Pointer) {
 	bp.lockRef()
 	idx, ok := bp.memRef[ptr]
-	if ok {
+	switch {
+	case ok:
 		delete(bp.memRef, ptr)
+	default:
+		delete(bp.memBig, ptr)
 	}
 	bp.unlockRef()
 	if ok {
@@ -165,7 +173,6 @@ func (bp *bufferpool) ReleasePointer(ptr unsafe.Pointer) {
 			bp.memCache[idx] = dst
 		}
 		bp.memCache[idx] = append(bp.memCache[idx], ptr)
-		//log.Println("release", ptr)
 		bp.unlockCache(idx)
 	}
 }

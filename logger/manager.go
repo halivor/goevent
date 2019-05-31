@@ -150,17 +150,17 @@ func newLogger(file string) (lg *logger, e error) {
 
 	lg = freeList[0]
 	freeList = freeList[1:]
-	lg.fileName = file
 
 	switch lg.FileInfo, e = os.Stat(file); {
 	case e != nil:
 		// 文件不存在，直接创建
 		var fp *os.File
 		if fp, e = os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644); e == nil {
-			lg.Writer = fp
 			if lg.FileInfo, e = os.Stat(file); e != nil {
-				return
+				freeList = append(freeList, lg)
+				return nil, e
 			}
+			lg.Writer = fp
 			if _, ok := mFnFI[lg.FileInfo.Name()]; !ok {
 				mFnFI[lg.FileInfo.Name()] = make(map[os.FileInfo]io.Writer, 8)
 			}
@@ -183,11 +183,10 @@ func newLogger(file string) (lg *logger, e error) {
 						mLoggers[w] = make(map[*logger]struct{}, 8)
 					}
 					mLoggers[w][lg] = struct{}{}
-					return
+					return lg, nil
 				}
 			}
 		}
-
 		// 若日志文件未打开，直接创建
 		if fp, e := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644); e == nil {
 			lg.Writer = fp
@@ -204,9 +203,11 @@ func newLogger(file string) (lg *logger, e error) {
 			mLoggers[fp][lg] = struct{}{}
 		}
 	default:
+		freeList = append(freeList, lg)
+		return nil, os.ErrInvalid
 	}
 
-	return
+	return lg, nil
 }
 
 func ReLog() {

@@ -17,7 +17,6 @@ type logger struct {
 	prefix string
 	flag   int
 	depth  int
-	buf    []byte
 
 	sync.Mutex
 	os.FileInfo
@@ -59,14 +58,14 @@ func (l *logger) Info(v ...interface{}) {
 	if INFO < l.level {
 		return
 	}
-	l.Output("INFO  ", fmt.Sprintln(v...))
+	l.Output("INFO ", fmt.Sprintln(v...))
 }
 
 func (l *logger) Warn(v ...interface{}) {
 	if WARN < l.level {
 		return
 	}
-	l.Output("WARN  ", fmt.Sprintln(v...))
+	l.Output("WARN ", fmt.Sprintln(v...))
 }
 
 func (l *logger) Output(level, s string) {
@@ -84,6 +83,7 @@ func (l *logger) Output(level, s string) {
 	length := len(level) + len(l.prefix) + 128 + len(s)
 	buf := bp.Alloc(length)[:0]
 	buf = append(buf, l.prefix...)
+	buf = append(buf, level...)
 	l.formatHeader(&buf, now, level, file, line)
 	buf = append(buf, s...)
 	if len(s) == 0 || s[len(s)-1] != '\n' {
@@ -120,7 +120,6 @@ func (l *logger) formatHeader(buf *[]byte, t time.Time, level, file string, line
 		}
 		*buf = append(*buf, ' ')
 	}
-	*buf = append(*buf, level...)
 	if l.flag&(Lshortfile|Llongfile) != 0 {
 		if l.flag&Lshortfile != 0 {
 			short := file

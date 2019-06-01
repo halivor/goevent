@@ -4,8 +4,6 @@ import (
 	"log"
 	"os"
 	"unsafe"
-
-	bp "github.com/halivor/goutility/bufferpool"
 )
 
 type Level uint32
@@ -81,7 +79,6 @@ func Release(l Logger) { // TODO: 放到 for/select 内部
 	locker.Lock()
 	if lg, ok := l.(*logger); ok {
 		freeList = append(freeList, lg)
-		bp.Release(lg.buf)
 		lg.FileInfo = nil
 		lg.Writer = nil
 		if lg.Writer != os.Stdout {
@@ -108,6 +105,10 @@ func Release(l Logger) { // TODO: 放到 for/select 内部
 	}
 	locker.Unlock()
 	return
+}
+
+func StdOutDebug() {
+	stdout = true
 }
 
 func SetPrefix(prefix string) {

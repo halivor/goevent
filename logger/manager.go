@@ -29,6 +29,7 @@ type nlogs struct {
 
 var (
 	locker    sync.RWMutex
+	stdout    bool                = false
 	arrLogger [MAX_LOGGERS]logger // 所有logger信息
 	freeList  []*logger
 
@@ -85,6 +86,9 @@ func flush(w io.Writer) {
 	if l, ok := mLogs[w]; ok {
 		for i := 0; i < l.n; i++ {
 			w.Write(l.list[i].data)
+			if stdout && w != os.Stdout {
+				os.Stdout.Write(l.list[i].data)
+			}
 			bp.Release(l.list[i].data)
 			l.list[i] = nil
 		}

@@ -24,7 +24,7 @@ type logger struct {
 }
 
 func (l *logger) SetLevel(level Level) {
-	if level < TRACE || level > PANIC {
+	if level < TRACE || level > WARN {
 		return
 	}
 	l.level = level

@@ -1,29 +1,7 @@
 package logger
 
 import (
-	"log"
 	"os"
-	"unsafe"
-)
-
-type Level uint32
-
-const (
-	TRACE Level = 1 + iota
-	DEBUG
-	INFO
-	WARN
-	PANIC
-)
-
-const (
-	Ldate         = log.Ldate
-	Ltime         = log.Ltime
-	Lmicroseconds = log.Lmicroseconds
-	Llongfile     = log.Llongfile
-	Lshortfile    = log.Lshortfile
-	LUTC          = log.LUTC
-	LstdFlags     = Ltime | Lshortfile
 )
 
 type Logger interface {
@@ -37,10 +15,6 @@ type Logger interface {
 }
 
 var glog *logger
-
-const (
-	logLen = int(unsafe.Sizeof(logger{}))
-)
 
 func New(file string, prefix string, flag int, level Level) (l *logger, e error) {
 	switch l, e = newLogger(file); {

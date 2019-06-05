@@ -220,7 +220,6 @@ func ReLog() {
 
 func reLog() {
 	locker.Lock()
-	defer locker.Unlock()
 	for w, fn := range mFile {
 		if fp, ok := w.(*os.File); ok {
 			fp.Close()
@@ -234,4 +233,5 @@ func reLog() {
 			*fp = *nfp
 		}
 	}
+	locker.Unlock()
 }

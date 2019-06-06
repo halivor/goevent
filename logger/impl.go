@@ -68,6 +68,14 @@ func (l *logger) Warn(v ...interface{}) {
 	l.Output("WARN ", fmt.Sprintln(v...))
 }
 
+func (l *logger) Flush() {
+	chFlush <- l.Writer
+}
+
+func (l *logger) FlushAll() {
+	chFlush <- nil
+}
+
 func (l *logger) Output(level, s string) {
 	now := time.Now() // get this early.
 	var file string

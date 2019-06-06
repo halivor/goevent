@@ -49,7 +49,7 @@ func StrToFlag(flags string) int {
 	var Flags = 0
 	fields := strings.Split(flags, "|")
 	for _, field := range fields {
-		if flag, ok := strFlag[field]; ok {
+		if flag, ok := strFlag[strings.TrimSpace(field)]; ok {
 			Flags |= flag
 		}
 	}

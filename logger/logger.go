@@ -12,6 +12,8 @@ type Logger interface {
 	Debug(v ...interface{})
 	Info(v ...interface{})
 	Warn(v ...interface{})
+	Flush()
+	FlushAll()
 }
 
 var glog *logger
@@ -111,4 +113,12 @@ func Info(v ...interface{}) {
 
 func Warn(v ...interface{}) {
 	glog.Warn(v)
+}
+
+func Flush() {
+	glog.Flush()
+}
+
+func FlushAll() {
+	glog.FlushAll()
 }

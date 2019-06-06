@@ -94,6 +94,9 @@ func flush(w io.Writer) {
 		}
 		l.n = 0
 	}
+	if fp, ok := w.(*os.File); ok {
+		fp.Sync()
+	}
 }
 
 func record(nl *nlogs) {
@@ -122,23 +125,28 @@ func write() {
 			flushAll()
 		case nl, ok := <-chNl:
 			if !ok {
-				chNl = make(chan *nlogs, 1024)
+				chNl = nil
 			}
 			record(nl)
 		case nl, ok := <-chWl:
 			if !ok {
-				chNl = make(chan *nlogs, 1024)
+				chNl = nil
 			}
 			record(nl)
 			flush(nl.w)
 		case w, ok := <-chFlush:
 			if !ok {
-				chFlush = make(chan io.Writer, 1024)
+				chFlush = nil
 			}
-			flush(w)
+			switch {
+			case w == nil:
+				flushAll()
+			default:
+				flush(w)
+			}
 		case _, ok := <-chReLog:
 			if !ok {
-				chReLog = make(chan struct{}, 1024)
+				chReLog = nil
 			}
 			// 重写日志
 			flushAll()

@@ -12,6 +12,7 @@ type Logger interface {
 	Debug(v ...interface{})
 	Info(v ...interface{})
 	Warn(v ...interface{})
+	Panic(v ...interface{})
 	Flush()
 	FlushAll()
 }
@@ -113,6 +114,14 @@ func Info(v ...interface{}) {
 
 func Warn(v ...interface{}) {
 	glog.Warn(v)
+	glog.Flush()
+}
+
+// TODO: 优雅使用panic
+func Panic(v ...interface{}) {
+	glog.Warn(v)
+	glog.FlushAll()
+	panic(v)
 }
 
 func Flush() {

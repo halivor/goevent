@@ -113,6 +113,7 @@ func (bp *bufferpool) Alloc(length int) (buf []byte, e error) {
 	return buf, nil
 }
 
+//TODO: return capacity
 func (bp *bufferpool) AllocPointer(length int) (p unsafe.Pointer, e error) {
 	for idx := 0; idx < MEM_SIZE; idx++ {
 		if length <= memSize[idx] {

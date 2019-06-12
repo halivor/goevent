@@ -34,7 +34,6 @@ var (
 	freeList  []*logger
 
 	chNl    chan *nlogs
-	chWl    chan *nlogs
 	chFlush chan io.Writer
 	chReLog chan struct{}
 
@@ -48,9 +47,8 @@ var (
 
 func init() {
 	chNl = make(chan *nlogs, 1024)
-	chWl = make(chan *nlogs, 1024)
-	chFlush = make(chan io.Writer, 1024)
-	chReLog = make(chan struct{}, 1024)
+	chFlush = make(chan io.Writer)
+	chReLog = make(chan struct{})
 
 	mFnFI = make(map[string]map[os.FileInfo]io.Writer, 1024) // file name -> file info
 	mFile = make(map[io.Writer]string, 1024)                 // io.Writer -> file name
@@ -78,6 +76,7 @@ func glogInit() {
 func flushAll() {
 	for w, _ := range wSet {
 		flush(w)
+		syncWrite(w)
 	}
 	wSet = make(map[io.Writer]struct{}, 128)
 }
@@ -94,6 +93,9 @@ func flush(w io.Writer) {
 		}
 		l.n = 0
 	}
+}
+
+func syncWrite(w io.Writer) {
 	if fp, ok := w.(*os.File); ok {
 		fp.Sync()
 	}
@@ -128,17 +130,12 @@ func write() {
 				chNl = nil
 			}
 			record(nl)
-		case nl, ok := <-chWl:
-			if !ok {
-				chNl = nil
-			}
-			record(nl)
-			flush(nl.w)
 		case w, ok := <-chFlush:
 			if !ok {
 				chFlush = nil
 			}
 			switch {
+			case w == os.Stdin:
 			case w == nil:
 				flushAll()
 			default:

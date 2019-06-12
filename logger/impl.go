@@ -66,6 +66,16 @@ func (l *logger) Warn(v ...interface{}) {
 		return
 	}
 	l.Output("WARN ", fmt.Sprintln(v...))
+	l.Flush()
+}
+
+func (l *logger) Panic(v ...interface{}) {
+	if WARN < l.level {
+		return
+	}
+	l.Output("PANIC ", fmt.Sprintln(v...))
+	l.FlushAll()
+	panic(v)
 }
 
 func (l *logger) Flush() {
@@ -74,6 +84,7 @@ func (l *logger) Flush() {
 
 func (l *logger) FlushAll() {
 	chFlush <- nil
+	chFlush <- os.Stdin
 }
 
 func (l *logger) Output(level, s string) {

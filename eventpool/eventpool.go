@@ -1,11 +1,11 @@
 package eventpool
 
 import (
-	"fmt"
-	"log"
 	"os"
 	"syscall"
 	"time"
+
+	log "github.com/halivor/goutility/logger"
 )
 
 type EventPool interface {
@@ -28,7 +28,7 @@ type eventpool struct {
 	es   map[int]Event        // pool中的event
 	tmo  *minHeap
 	stop bool
-	*log.Logger
+	log.Logger
 }
 
 func New() *eventpool {
@@ -37,6 +37,7 @@ func New() *eventpool {
 
 func new(epo *eventpool) *eventpool {
 	fd, e := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
+	logger, _ := log.New("/data/logs/eventpool.log", "", log.LstdFlags, log.DEBUG)
 	switch {
 	case e == nil && epo == nil:
 		epo = &eventpool{
@@ -45,11 +46,11 @@ func new(epo *eventpool) *eventpool {
 			es:     make(map[int]Event, maxConns),
 			tmo:    newHeap(),
 			stop:   false,
-			Logger: log.New(os.Stderr, fmt.Sprintf("[ep(%d)] ", fd), log.LstdFlags),
+			Logger: logger,
 		}
 	case e == nil:
 		epo.fd = fd
-		epo.Logger = log.New(os.Stderr, fmt.Sprintf("[ep(%d)] ", fd), log.LstdFlags)
+		epo.Logger = logger
 	default:
 		// EINVAL (epoll_create1()) Invalid value specified in flags.
 		// EMFILE The per-user limit on the number of epoll instances imposed by
@@ -67,7 +68,7 @@ func new(epo *eventpool) *eventpool {
 
 func (ep *eventpool) AddEvent(ev Event) error {
 	ep.es[ev.Fd()] = ev
-	ep.Println("add event", ev.Fd(), ev.Event())
+	ep.Trace("add event", ev.Fd(), ev.Event())
 	switch e := syscall.EpollCtl(ep.fd,
 		syscall.EPOLL_CTL_ADD,
 		ev.Fd(),
@@ -82,14 +83,14 @@ func (ep *eventpool) AddEvent(ev Event) error {
 		return e
 	default:
 		// 不应该有其他错误信息
-		ep.Println("event add", ev, e)
+		ep.Warn("event add", ev, e)
 		return e
 	}
 	return nil
 }
 
 func (ep *eventpool) ModEvent(ev Event) error {
-	ep.Println("mod event", ev.Fd(), ev.Event())
+	ep.Trace("mod event", ev.Fd(), ev.Event())
 	switch e := syscall.EpollCtl(ep.fd,
 		syscall.EPOLL_CTL_MOD,
 		ev.Fd(),
@@ -104,14 +105,14 @@ func (ep *eventpool) ModEvent(ev Event) error {
 		return e
 	default:
 		// 理论上不存在其他错误信息
-		ep.Println("event mod", ev, e)
+		ep.Warn("event mod", ev, e)
 		return e
 	}
 	return nil
 }
 
 func (ep *eventpool) DelEvent(ev Event) error {
-	ep.Println("del event", ev.Fd(), ev.Event())
+	ep.Trace("del event", ev.Fd(), ev.Event())
 	delete(ep.es, ev.Fd())
 	switch e := syscall.EpollCtl(ep.fd,
 		syscall.EPOLL_CTL_DEL,
@@ -127,7 +128,7 @@ func (ep *eventpool) DelEvent(ev Event) error {
 		return e
 	default:
 		// 理论上不存在其他错误信息
-		ep.Println("event del", ev, e)
+		ep.Warn("event del", ev, e)
 		return e
 	}
 	return nil
@@ -141,7 +142,7 @@ func (ep *eventpool) Run() {
 			if n == 0 {
 				now := time.Now().UnixNano() / (1000 * 1000)
 				for ep.tmo.Top() <= now {
-					ep.Println("timeout event")
+					ep.Trace("timeout event")
 					exp := ep.tmo.Pop()
 					if ev, ok := exp.(Event); ok {
 						ev.CallBack(EV_TIMEOUT)
@@ -160,14 +161,14 @@ func (ep *eventpool) Run() {
 			// EINVAL epfd is not an epoll file descriptor, or maxevents is less
 			//        than or equal to zero.
 
-			ep.Println("epoll wait error", e)
+			ep.Warn("epoll wait error", e)
 			if e := ep.rebuild(); e != nil {
-				ep.Println("ep run failed,", e)
+				ep.Warn("ep run failed,", e)
 				return
 			}
 		}
 	}
-	ep.Println("event pool stop")
+	ep.Debug("event pool stop")
 }
 
 func (ep *eventpool) Release() {
@@ -179,7 +180,7 @@ func (ep *eventpool) Release() {
 func (ep *eventpool) rebuild() (e error) {
 	defer func() {
 		if r := recover(); r != nil {
-			ep.Println("rebuild panic", r)
+			ep.Warn("rebuild panic", r)
 			e = os.ErrInvalid
 		}
 	}()

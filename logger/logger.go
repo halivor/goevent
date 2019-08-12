@@ -55,9 +55,8 @@ func NewStdOut(prefix string, flag int, level Level) *logger {
 func Release(l Logger) { // TODO: 放到 for/select 内部
 	locker.Lock()
 	if lg, ok := l.(*logger); ok {
+		flush(lg.Writer)
 		freeList = append(freeList, lg)
-		lg.FileInfo = nil
-		lg.Writer = nil
 		if lg.Writer != os.Stdout {
 			if lgs, ok := mLoggers[lg.Writer]; ok {
 				delete(lgs, lg)    // io.writer -> []*logger
@@ -72,13 +71,15 @@ func Release(l Logger) { // TODO: 放到 for/select 内部
 					delete(mLoggers, lg.Writer) // io.writer -> logger
 					delete(mFile, lg.Writer)    // io.writer -> file name
 
-					chFlush <- lg.Writer
 					if fp, ok := lg.Writer.(*os.File); ok {
 						fp.Close()
 					}
 				}
 			}
 		}
+		// TODO: 细致修改
+		lg.FileInfo = nil
+		lg.Writer = nil
 	}
 	locker.Unlock()
 	return

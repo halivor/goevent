@@ -17,7 +17,7 @@ const (
 )
 
 type logList struct {
-	list [4096]*nlogs
+	list [MAX_LOGS]*nlogs
 	n    int
 }
 
@@ -46,16 +46,16 @@ var (
 )
 
 func init() {
-	chNl = make(chan *nlogs, 1024)
-	chFlush = make(chan io.Writer)
+	chNl = make(chan *nlogs, 1024*1024)
+	chFlush = make(chan io.Writer, 1024)
 	chReLog = make(chan struct{})
 
 	mFnFI = make(map[string]map[os.FileInfo]io.Writer, 1024) // file name -> file info
 	mFile = make(map[io.Writer]string, 1024)                 // io.Writer -> file name
 	mLoggers = make(map[io.Writer]map[*logger]struct{}, 1024)
 
-	mLogs = make(map[io.Writer]*logList)     // write -> log list
-	wSet = make(map[io.Writer]struct{}, 128) // wait to write
+	mLogs = make(map[io.Writer]*logList, 256) // write -> log list
+	wSet = make(map[io.Writer]struct{}, 128)  // wait to write
 
 	freeList = make([]*logger, 0, MAX_LOGGERS) // free loggers
 	for i := 0; i < MAX_LOGGERS; i++ {
@@ -76,17 +76,19 @@ func glogInit() {
 func flushAll() {
 	for w, _ := range wSet {
 		flush(w)
-		syncWrite(w)
+		// syncWrite(w) TODO: 确认实际效果
 	}
 	wSet = make(map[io.Writer]struct{}, 128)
 }
 
 func flush(w io.Writer) {
-	if l, ok := mLogs[w]; ok {
+	if l, ok := mLogs[w]; ok && l.n > 0 {
 		for i := 0; i < l.n; i++ {
-			w.Write(l.list[i].data)
-			if stdout && w != os.Stdout {
-				os.Stdout.Write(l.list[i].data)
+			if w != nil {
+				w.Write(l.list[i].data)
+				if stdout && w != os.Stdout {
+					os.Stdout.Write(l.list[i].data)
+				}
 			}
 			bp.Release(l.list[i].data)
 			l.list[i] = nil
@@ -120,22 +122,14 @@ func record(nl *nlogs) {
 }
 
 func write() {
-	tn := time.NewTicker(time.Millisecond * 100)
+	t := time.NewTicker(time.Millisecond * 200)
 	for {
 		select {
-		case <-tn.C:
-			flushAll()
-		case nl, ok := <-chNl:
-			if !ok {
-				chNl = nil
-			}
-			record(nl)
 		case w, ok := <-chFlush:
 			if !ok {
 				chFlush = nil
 			}
 			switch {
-			case w == os.Stdin:
 			case w == nil:
 				flushAll()
 			default:
@@ -145,14 +139,38 @@ func write() {
 			if !ok {
 				chReLog = nil
 			}
-			// 重写日志
 			flushAll()
-			reLog()
+			reLog() // 切换日志
+		default:
+			select {
+			case <-t.C:
+				flushAll()
+			case nl, ok := <-chNl:
+				if !ok {
+					chNl = nil
+				}
+				record(nl)
+			case w, ok := <-chFlush:
+				if !ok {
+					chFlush = nil
+				}
+				switch {
+				case w == nil:
+					flushAll()
+				default:
+					flush(w)
+				}
+			case _, ok := <-chReLog:
+				if !ok {
+					chReLog = nil
+				}
+				flushAll()
+				reLog() // 切换日志
+			}
 		}
 	}
 }
 
-// TODO: error
 func newLogger(file string) (lg *logger, e error) {
 	locker.Lock()
 	defer locker.Unlock()
@@ -160,6 +178,7 @@ func newLogger(file string) (lg *logger, e error) {
 	lg = freeList[0]
 	freeList = freeList[1:]
 
+	// TODO: 创建目录
 	switch lg.FileInfo, e = os.Stat(file); {
 	case e != nil:
 		// 文件不存在，直接创建
@@ -230,7 +249,7 @@ func reLog() {
 			fp.Close()
 			now := time.Now().Format("20060102.150405")
 			if fn, ok := mFile[fp]; ok {
-				if _, e := os.Stat(fn); e == nil {
+				if fi, e := os.Stat(fn); e == nil && fi.Size() > 1024*1024 {
 					os.Rename(fn, fn+"."+now)
 				}
 			}

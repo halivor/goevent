@@ -8,6 +8,7 @@ type Logger interface {
 	SetFlags(flags int)
 	SetLevel(level Level)
 	SetPrefix(prefix string)
+	Raw(v ...interface{})
 	Trace(v ...interface{})
 	Debug(v ...interface{})
 	Info(v ...interface{})
@@ -20,7 +21,7 @@ type Logger interface {
 var glog *logger
 
 func New(file string, prefix string, flag int, level Level) (l *logger, e error) {
-	switch l, e = newLogger(file); {
+	switch l, e = newLogger(gPath + file); {
 	case e != nil:
 		return nil, e
 	default:
@@ -55,7 +56,7 @@ func NewStdOut(prefix string, flag int, level Level) *logger {
 func Release(l Logger) { // TODO: 放到 for/select 内部
 	locker.Lock()
 	if lg, ok := l.(*logger); ok {
-		flush(lg.Writer)
+		chFlush <- lg.Writer
 		freeList = append(freeList, lg)
 		if lg.Writer != os.Stdout {
 			if lgs, ok := mLoggers[lg.Writer]; ok {

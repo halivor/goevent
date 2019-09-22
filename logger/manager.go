@@ -12,7 +12,7 @@ import (
 
 const (
 	INIT_LOGGERS = 4096
-	MAX_LOGGERS  = 4096
+	MAX_LOGGERS  = 1024 * 1024
 	MAX_LOGS     = 4096
 )
 
@@ -47,7 +47,7 @@ var (
 
 func init() {
 	chNl = make(chan *nlogs, 1024*1024)
-	chFlush = make(chan io.Writer, 1024)
+	chFlush = make(chan io.Writer)
 	chReLog = make(chan struct{})
 
 	mFnFI = make(map[string]map[os.FileInfo]io.Writer, 1024) // file name -> file info
@@ -135,12 +135,6 @@ func write() {
 			default:
 				flush(w)
 			}
-		case _, ok := <-chReLog:
-			if !ok {
-				chReLog = nil
-			}
-			flushAll()
-			reLog() // 切换日志
 		default:
 			select {
 			case <-t.C:

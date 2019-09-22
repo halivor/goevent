@@ -40,6 +40,18 @@ func (l *logger) SetFlags(flag int) {
 	l.flag = flag
 }
 
+func (l *logger) Raw(v ...interface{}) {
+	if TRACE < l.level {
+		return
+	}
+
+	s := fmt.Sprintln(v...)
+	if len(s) == 0 || s[len(s)-1] != '\n' {
+		s += "\n"
+	}
+	chNl <- &nlogs{w: l.Writer, data: []byte(s)}
+}
+
 func (l *logger) Trace(v ...interface{}) {
 	if TRACE < l.level {
 		return

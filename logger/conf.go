@@ -2,6 +2,7 @@ package logger
 
 import (
 	"log"
+	"os"
 	"strings"
 	"unsafe"
 )
@@ -43,6 +44,7 @@ var (
 		"LUTC":          LUTC,
 		"LstdFlags":     LstdFlags,
 	}
+	gPath string
 )
 
 func StrToFlag(flags string) int {
@@ -61,4 +63,11 @@ func StrToLvl(level string) Level {
 		return lvl
 	}
 	return DEBUG
+}
+
+func SetGlobalPath(path string) {
+	gPath = path
+	if e := os.MkdirAll(gPath, 0755); e != nil {
+		panic(e)
+	}
 }

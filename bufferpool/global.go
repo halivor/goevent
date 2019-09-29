@@ -39,3 +39,11 @@ func Release(buf []byte) {
 func ReleasePointer(ptr unsafe.Pointer) {
 	gbp.ReleasePointer(ptr)
 }
+
+func Free(buf []byte) {
+	ReleasePointer(unsafe.Pointer(&buf[0]))
+}
+
+func FreePtr(ptr unsafe.Pointer) {
+	gbp.ReleasePointer(ptr)
+}

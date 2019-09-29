@@ -56,28 +56,28 @@ func (l *logger) Trace(v ...interface{}) {
 	if TRACE < l.level {
 		return
 	}
-	l.Output("TRACE ", fmt.Sprintln(v...))
+	l.Output("T ", fmt.Sprintln(v...))
 }
 
 func (l *logger) Debug(v ...interface{}) {
 	if DEBUG < l.level {
 		return
 	}
-	l.Output("DEBUG ", fmt.Sprintln(v...))
+	l.Output("D ", fmt.Sprintln(v...))
 }
 
 func (l *logger) Info(v ...interface{}) {
 	if INFO < l.level {
 		return
 	}
-	l.Output("INFO  ", fmt.Sprintln(v...))
+	l.Output("I ", fmt.Sprintln(v...))
 }
 
 func (l *logger) Warn(v ...interface{}) {
 	if WARN < l.level {
 		return
 	}
-	l.Output("WARN  ", fmt.Sprintln(v...))
+	l.Output("W ", fmt.Sprintln(v...))
 	l.Flush()
 }
 
@@ -85,7 +85,7 @@ func (l *logger) Panic(v ...interface{}) {
 	if WARN < l.level {
 		return
 	}
-	l.Output("PANIC ", fmt.Sprintln(v...))
+	l.Output("P ", fmt.Sprintln(v...))
 	l.FlushAll()
 	panic(v)
 }

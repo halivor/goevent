@@ -2,6 +2,7 @@ package bufferpool
 
 import (
 	"log"
+	"time"
 	"unsafe"
 )
 
@@ -10,6 +11,7 @@ var locker uint32
 
 func init() {
 	gbp = New()
+	go static()
 }
 
 func Alloc(length int) []byte {
@@ -20,30 +22,36 @@ func Alloc(length int) []byte {
 	return b
 }
 
-func AllocPointer(length int) unsafe.Pointer {
-	b, _ := gbp.AllocPointer(length)
-	return b
-}
-
 func Realloc(src []byte, length int) []byte {
 	dst := Alloc(length)
 	copy(dst, src)
-	Release(src)
+	Free(src)
 	return dst
 }
 
-func Release(buf []byte) {
-	ReleasePointer(unsafe.Pointer(&buf[0]))
-}
-
-func ReleasePointer(ptr unsafe.Pointer) {
-	gbp.ReleasePointer(ptr)
-}
-
 func Free(buf []byte) {
-	ReleasePointer(unsafe.Pointer(&buf[0]))
+	gbp.Free(buf)
 }
 
-func FreePtr(ptr unsafe.Pointer) {
-	gbp.ReleasePointer(ptr)
+func AllocPointer(length int) unsafe.Pointer {
+	ptr, e := gbp.AllocPointer(length)
+	if e != nil {
+		log.Println(e)
+	}
+	return ptr
+
+}
+
+func FreePointer(ptr unsafe.Pointer) {
+	gbp.FreePointer(ptr)
+}
+
+func static() {
+	tick := time.NewTicker(time.Second)
+	for {
+		select {
+		case <-tick.C:
+			log.Println(3, gbp.memCap[3])
+		}
+	}
 }

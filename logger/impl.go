@@ -7,9 +7,12 @@ import (
 	"runtime"
 	"sync"
 	"time"
+	"unsafe"
 
 	bp "github.com/halivor/goutility/bufferpool"
 )
+
+const ID_LEN = int(unsafe.Sizeof(int(1)))
 
 type logger struct {
 	id     int
@@ -49,7 +52,7 @@ func (l *logger) Raw(v ...interface{}) {
 	if len(s) == 0 || s[len(s)-1] != '\n' {
 		s += "\n"
 	}
-	chNl <- &nlogs{w: l.Writer, data: []byte(s)}
+	//chNl <- &nlogs{w: l.Writer, data: []byte(s)}
 }
 
 func (l *logger) Trace(v ...interface{}) {
@@ -110,8 +113,9 @@ func (l *logger) Output(level, s string) {
 			line = 0
 		}
 	}
-	length := len(level) + len(l.prefix) + 128 + len(s)
-	buf := bp.Alloc(length)[:0]
+	length := ID_LEN + len(level) + len(l.prefix) + 128 + len(s)
+	buf := bp.Alloc(length)[:ID_LEN]
+	*((*uintptr)(unsafe.Pointer(&buf[0]))) = uintptr(unsafe.Pointer(l))
 	buf = append(buf, level...)
 	l.formatHeader(&buf, now, level, file, line)
 	buf = append(buf, l.prefix...)
@@ -119,7 +123,7 @@ func (l *logger) Output(level, s string) {
 	if len(s) == 0 || s[len(s)-1] != '\n' {
 		buf = append(buf, '\n')
 	}
-	chNl <- &nlogs{w: l.Writer, data: buf}
+	chNl <- buf
 }
 
 func (l *logger) formatHeader(buf *[]byte, t time.Time, level, file string, line int) {

@@ -7,6 +7,12 @@ import (
 	"unsafe"
 )
 
+const (
+	INIT_LOGGERS = 4096
+	MAX_LOGGERS  = 1024 * 1024
+	MAX_LOGS     = 4096
+)
+
 type Level uint32
 
 const (

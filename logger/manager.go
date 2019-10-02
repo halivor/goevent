@@ -2,22 +2,16 @@ package logger
 
 import (
 	"io"
-	"log"
 	"os"
 	"sync"
 	"time"
+	"unsafe"
 
 	bp "github.com/halivor/goutility/bufferpool"
 )
 
-const (
-	INIT_LOGGERS = 4096
-	MAX_LOGGERS  = 1024 * 1024
-	MAX_LOGS     = 4096
-)
-
 type logList struct {
-	list [MAX_LOGS]*nlogs
+	list [MAX_LOGS][]byte
 	n    int
 }
 
@@ -29,68 +23,99 @@ type nlogs struct {
 
 var (
 	locker    sync.RWMutex
-	stdout    bool                = false
-	arrLogger [MAX_LOGGERS]logger // 所有logger信息
-	freeList  []*logger
+	stdout    bool                   = false
+	arrLogger [MAX_LOGGERS]logger    // 所有logger信息
+	slice     map[string]interface{} = map[string]interface{}{}
 
-	chNl    chan *nlogs
-	chFlush chan io.Writer
-	chReLog chan struct{}
+	chNl    chan []byte    = make(chan []byte, 1024*1024)
+	chFlush chan io.Writer = make(chan io.Writer)
+	chReLog chan struct{}  = make(chan struct{})
 
 	mFnFI    map[string]map[os.FileInfo]io.Writer // 不同位置的同名文件的文件信息
-	mLoggers map[io.Writer]map[*logger]struct{}
-	mFile    map[io.Writer]string
+	mLoggers map[io.Writer]map[*logger]struct{}   //
+	mFiles   map[io.Writer]string                 // 日志切分时使用
 
-	mLogs map[io.Writer]*logList // writer到实际日志的映射
-	wSet  map[io.Writer]struct{} // 待写入write
+	mLogs map[io.Writer]*logList = make(map[io.Writer]*logList, 32) // writer到实际日志的映射
+	wSet  map[io.Writer]struct{} = make(map[io.Writer]struct{}, 32) // 待写入write
 )
 
 func init() {
-	chNl = make(chan *nlogs, 1024*1024)
-	chFlush = make(chan io.Writer)
-	chReLog = make(chan struct{})
-
 	mFnFI = make(map[string]map[os.FileInfo]io.Writer, 1024) // file name -> file info
-	mFile = make(map[io.Writer]string, 1024)                 // io.Writer -> file name
+	mFiles = make(map[io.Writer]string, 1024)                // io.Writer -> file name
 	mLoggers = make(map[io.Writer]map[*logger]struct{}, 1024)
 
-	mLogs = make(map[io.Writer]*logList, 256) // write -> log list
-	wSet = make(map[io.Writer]struct{}, 128)  // wait to write
-
-	freeList = make([]*logger, 0, MAX_LOGGERS) // free loggers
-	for i := 0; i < MAX_LOGGERS; i++ {
-		arrLogger[i].id = i
-		freeList = append(freeList, &arrLogger[i])
-	}
 	mLogs[os.Stdout] = &logList{}
-
-	glogInit()
-	go write()
+	go logging()
 }
 
-func glogInit() {
-	glog = NewStdOut("", log.Lshortfile|log.Ltime, DEBUG)
-	glog.depth = 3
-}
-
-func flushAll() {
-	for w, _ := range wSet {
-		flush(w)
-		// syncWrite(w) TODO: 确认实际效果
+func logging() {
+	t := time.NewTicker(time.Millisecond * 500)
+	for {
+		select {
+		case w := <-chFlush:
+			switch {
+			case w == nil:
+				flushAll()
+			default:
+				flush(w)
+			}
+		case <-t.C:
+			flushAll()
+		case <-chReLog:
+			flushAll()
+			reLog()
+		default:
+			for i := 0; i < 10; i++ {
+				select {
+				case nl := <-chNl:
+					note(nl)
+				case <-t.C:
+					flushAll()
+				case w := <-chFlush:
+					switch {
+					case w == nil:
+						flushAll()
+					default:
+						flush(w)
+					}
+				case <-chReLog:
+					flushAll()
+					reLog()
+				}
+			}
+		}
 	}
-	wSet = make(map[io.Writer]struct{}, 128)
+}
+
+func note(data []byte) {
+	lg := (*logger)((unsafe.Pointer)((*((*uintptr)(unsafe.Pointer(&data[0]))))))
+	wSet[lg.Writer] = struct{}{}
+	switch ls, ok := mLogs[lg.Writer]; {
+	case ok && ls.n+2 < MAX_LOGS:
+		ls.list[ls.n] = data
+		ls.n++
+	case ok && ls.n+2 == MAX_LOGS:
+		ls.list[ls.n] = data
+		ls.n++
+		flush(lg.Writer)
+	default:
+		l := &logList{}
+		l.list[l.n] = data
+		l.n++
+		mLogs[lg.Writer] = l
+	}
 }
 
 func flush(w io.Writer) {
 	if l, ok := mLogs[w]; ok && l.n > 0 {
 		for i := 0; i < l.n; i++ {
 			if w != nil {
-				w.Write(l.list[i].data)
+				w.Write(l.list[i][ID_LEN:])
 				if stdout && w != os.Stdout {
-					os.Stdout.Write(l.list[i].data)
+					os.Stdout.Write(l.list[i][ID_LEN:])
 				}
 			}
-			bp.Release(l.list[i].data)
+			bp.Free(l.list[i])
 			l.list[i] = nil
 		}
 		l.n = 0
@@ -103,153 +128,53 @@ func syncWrite(w io.Writer) {
 	}
 }
 
-func record(nl *nlogs) {
-	wSet[nl.w] = struct{}{}
-	switch l, ok := mLogs[nl.w]; {
-	case ok && l.n+2 < MAX_LOGS:
-		l.list[l.n] = nl
-		l.n++
-	case ok && l.n+2 == MAX_LOGS:
-		l.list[l.n] = nl
-		l.n++
-		flush(nl.w)
-	default:
-		l := &logList{}
-		mLogs[nl.w] = l
-		l.list[l.n] = nl
-		l.n++
+func flushAll() {
+	for w, _ := range wSet {
+		flush(w)
 	}
+	wSet = make(map[io.Writer]struct{}, 32)
 }
 
-func write() {
-	t := time.NewTicker(time.Millisecond * 200)
-	for {
-		select {
-		case w, ok := <-chFlush:
-			if !ok {
-				chFlush = nil
-			}
-			switch {
-			case w == nil:
-				flushAll()
-			default:
-				flush(w)
-			}
-		default:
-			select {
-			case <-t.C:
-				flushAll()
-			case nl, ok := <-chNl:
-				if !ok {
-					chNl = nil
-				}
-				record(nl)
-			case w, ok := <-chFlush:
-				if !ok {
-					chFlush = nil
-				}
-				switch {
-				case w == nil:
-					flushAll()
-				default:
-					flush(w)
-				}
-			case _, ok := <-chReLog:
-				if !ok {
-					chReLog = nil
-				}
-				flushAll()
-				reLog() // 切换日志
-			}
-		}
-	}
-}
-
-func newLogger(file string) (lg *logger, e error) {
+func newLogger(file string) (*logger, error) {
 	locker.Lock()
 	defer locker.Unlock()
-
-	lg = freeList[0]
-	freeList = freeList[1:]
-
 	// TODO: 创建目录
-	switch lg.FileInfo, e = os.Stat(file); {
-	case e != nil:
-		// 文件不存在，直接创建
-		var fp *os.File
-		if fp, e = os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644); e == nil {
-			if lg.FileInfo, e = os.Stat(file); e != nil {
-				freeList = append(freeList, lg)
-				return nil, e
-			}
-			lg.Writer = fp
-			if _, ok := mFnFI[lg.FileInfo.Name()]; !ok {
-				mFnFI[lg.FileInfo.Name()] = make(map[os.FileInfo]io.Writer, 8)
-			}
-			mFnFI[lg.FileInfo.Name()][lg.FileInfo] = fp
-
-			mFile[fp] = file
-			if _, ok := mLoggers[lg]; !ok {
-				mLoggers[fp] = make(map[*logger]struct{}, 8)
-			}
-			mLoggers[fp][lg] = struct{}{}
-		}
+	switch fi, e := os.Stat(file); {
+	case os.IsNotExist(e):
+		return createFile(file)
 	case e == nil:
-		// 文件已存在，根据打开情况处理
-		if efis, ok := mFnFI[lg.FileInfo.Name()]; ok && len(efis) > 0 {
-			for efi, w := range efis {
-				if os.SameFile(efi, lg.FileInfo) {
-					lg.Writer = w
-					lg.FileInfo = efi
-					if _, ok := mLoggers[w]; !ok {
-						mLoggers[w] = make(map[*logger]struct{}, 8)
-					}
-					mLoggers[w][lg] = struct{}{}
-					return lg, nil
+		return useFile(file, fi)
+	}
+	return nil, os.ErrInvalid
+}
+
+func release(lg *logger) {
+	chFlush <- lg.Writer
+	if freeList = append(freeList, lg); len(freeList) == cap(freeList) {
+		if si, ok := slice["freeList"]; ok {
+			if list, ok := si.([]*logger); ok {
+				copy(list, freeList)
+				freeList = list
+			}
+		}
+	}
+
+	if lg.Writer != os.Stdout {
+		if lgs, ok := mLoggers[lg.Writer]; ok {
+			delete(lgs, lg)    // io.writer -> []*logger
+			if len(lgs) == 0 { // io.writer -> close
+				delete(mLoggers, lg.Writer) // io.writer -> logger
+				delete(mFiles, lg.Writer)   // io.writer -> file name
+				// base name -> []file info -> io.writer
+				if fw, ok := mFnFI[lg.FileInfo.Name()]; ok {
+					delete(fw, lg.FileInfo)
+				}
+				if fp, ok := lg.Writer.(*os.File); ok {
+					fp.Close()
 				}
 			}
 		}
-		// 若日志文件未打开，直接创建
-		if fp, e := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644); e == nil {
-			lg.Writer = fp
-			lg.FileInfo, e = os.Stat(file)
-			if _, ok := mFnFI[lg.FileInfo.Name()]; !ok {
-				mFnFI[lg.FileInfo.Name()] = make(map[os.FileInfo]io.Writer, 8)
-			}
-			mFnFI[lg.FileInfo.Name()][lg.FileInfo] = fp
-
-			mFile[fp] = file
-			if _, ok := mLoggers[lg]; !ok {
-				mLoggers[fp] = make(map[*logger]struct{}, 8)
-			}
-			mLoggers[fp][lg] = struct{}{}
-		}
-	default:
-		freeList = append(freeList, lg)
-		return nil, os.ErrInvalid
 	}
-
-	return lg, nil
-}
-
-func ReLog() {
-	chReLog <- struct{}{}
-}
-
-func reLog() {
-	locker.Lock()
-	for w, fn := range mFile {
-		if fp, ok := w.(*os.File); ok {
-			fp.Close()
-			now := time.Now().Format("20060102.150405")
-			if fn, ok := mFile[fp]; ok {
-				if fi, e := os.Stat(fn); e == nil && fi.Size() > 1024*1024 {
-					os.Rename(fn, fn+"."+now)
-				}
-			}
-			nfp, _ := os.OpenFile(fn, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
-			*fp = *nfp
-		}
-	}
-	locker.Unlock()
+	lg.FileInfo = nil
+	lg.Writer = nil
 }

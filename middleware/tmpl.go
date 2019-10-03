@@ -1,7 +1,5 @@
 package middleware
 
-import ()
-
 type MwTmpl struct {
 	Id  QId
 	QId map[string]QId

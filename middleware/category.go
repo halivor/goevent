@@ -1,5 +1,9 @@
 package middleware
 
+import (
+	"sync/atomic"
+)
+
 type MwId int32 // 中间件类型ID
 type QId int32  // 队列ID
 type AId int32  // 身份ID
@@ -17,13 +21,6 @@ type Consumer interface {
 }
 
 // 中间件类型
-const (
-	T_TRANSFER MwId = 1 << iota // 透明转发
-	T_CHECK                     // 消息校验
-	T_EXISTS                    // Peer ID 校验
-	T_CHAT                      // 私聊消息
-	T_BULLET                    // 聊天消息
-)
 
 // 行为
 const (
@@ -34,9 +31,14 @@ const (
 type newCp func() Mwer
 
 var components map[MwId]newCp
+var mwId MwId = 1000
 
 func init() {
 	components = make(map[MwId]newCp, 64)
+}
+
+func NewMwId() MwId {
+	return MwId(atomic.AddInt32((*int32)(&mwId), 8))
 }
 
 func Register(id MwId, New newCp) {

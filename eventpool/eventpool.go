@@ -37,7 +37,7 @@ func New() *eventpool {
 
 func new(epo *eventpool) *eventpool {
 	fd, e := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
-	logger, _ := log.New("/data/logs/eventpool.log", "", log.LstdFlags, log.DEBUG)
+	logger, _ := log.New("eventpool.log", "", log.LstdFlags, log.DEBUG)
 	switch {
 	case e == nil && epo == nil:
 		epo = &eventpool{

@@ -11,7 +11,6 @@ var locker uint32
 
 func init() {
 	gbp = New()
-	go static()
 }
 
 func Alloc(length int) []byte {

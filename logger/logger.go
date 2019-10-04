@@ -18,6 +18,21 @@ type Logger interface {
 	FlushAll()
 }
 
+func NewLog(file string, prefix string, flag int, level Level) *logger {
+	switch l, e := newLogger(gPath + file); {
+	case e != nil:
+		panic(e)
+	default:
+		if len(prefix) > 0 {
+			l.prefix = prefix + " "
+		}
+		l.level = level
+		l.flag = flag
+		l.depth = 2
+		return l
+	}
+}
+
 func New(file string, prefix string, flag int, level Level) (l *logger, e error) {
 	switch l, e = newLogger(gPath + file); {
 	case e != nil:

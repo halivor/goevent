@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 	"unsafe"
 )
 
@@ -50,7 +51,8 @@ var (
 		"LUTC":          LUTC,
 		"LstdFlags":     LstdFlags,
 	}
-	gPath string
+	gPath      string
+	flushMsecs time.Duration
 )
 
 func StrToFlag(flags string) int {
@@ -76,4 +78,9 @@ func SetGlobalPath(path string) {
 	if e := os.MkdirAll(gPath, 0755); e != nil {
 		panic(e)
 	}
+}
+
+func SetFlushMsecs(msec time.Duration) {
+	flushMsecs = msec * time.Millisecond
+	chItvl <- struct{}{}
 }

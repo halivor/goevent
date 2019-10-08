@@ -30,6 +30,7 @@ var (
 	chNl    chan []byte    = make(chan []byte, 1024*1024)
 	chFlush chan io.Writer = make(chan io.Writer)
 	chReLog chan struct{}  = make(chan struct{})
+	chItvl  chan struct{}  = make(chan struct{})
 
 	mFnFI    map[string]map[os.FileInfo]io.Writer // 不同位置的同名文件的文件信息
 	mLoggers map[io.Writer]map[*logger]struct{}   //
@@ -49,7 +50,7 @@ func init() {
 }
 
 func logging() {
-	t := time.NewTicker(time.Millisecond * 500)
+	t := time.NewTicker(flushMsecs)
 	for {
 		select {
 		case w := <-chFlush:
@@ -81,6 +82,9 @@ func logging() {
 				case <-chReLog:
 					flushAll()
 					reLog()
+				case <-chItvl:
+					t.Stop()
+					t = time.NewTicker(flushMsecs)
 				}
 			}
 		}

@@ -52,7 +52,7 @@ var (
 		"LstdFlags":     LstdFlags,
 	}
 	gPath      string
-	flushMsecs time.Duration
+	flushMsecs time.Duration = 500 * time.Millisecond
 )
 
 func StrToFlag(flags string) int {
@@ -80,7 +80,7 @@ func SetGlobalPath(path string) {
 	}
 }
 
-func SetFlushMsecs(msec time.Duration) {
-	flushMsecs = msec * time.Millisecond
+func SetFlushMsecs(msec int) {
+	flushMsecs = time.Duration(msec) * time.Millisecond
 	chItvl <- struct{}{}
 }

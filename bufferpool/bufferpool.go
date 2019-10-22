@@ -99,7 +99,7 @@ func (bp *bufferpool) Free(buf []byte) {
 
 func (bp *bufferpool) AllocPointer(length int) (unsafe.Pointer, error) {
 	switch {
-	case length >= BUF_MAX_LEN:
+	case length >= MAX_SIZE:
 		buffer := make([]byte, length+1)
 		buffer[0] = 'B'
 		bp.mbLock()

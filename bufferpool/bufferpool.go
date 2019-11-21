@@ -153,9 +153,9 @@ func (bp *bufferpool) freePointer(ptr unsafe.Pointer) {
 			src := bp.memCache[idx]
 			dst := bp.memSlice[idx][:len(src)]
 			copy(dst, src)
-			log.Println(idx, cap(bp.memSlice[idx]),
-				"src", len(src), cap(src),
-				"dst", len(dst), cap(dst))
+			/*log.Println(idx, cap(bp.memSlice[idx]),*/
+			//"src", len(src), cap(src),
+			/*"dst", len(dst), cap(dst))*/
 			bp.memCache[idx] = dst
 		}
 		//log.Println("free   ", ptr)

@@ -55,6 +55,13 @@ func (l *logger) Raw(v ...interface{}) {
 	//chNl <- &nlogs{w: l.Writer, data: []byte(s)}
 }
 
+func (l *logger) Println(v ...interface{}) {
+	if TRACE < l.level {
+		return
+	}
+	l.Output("P ", fmt.Sprintln(v...))
+}
+
 func (l *logger) Trace(v ...interface{}) {
 	if TRACE < l.level {
 		return

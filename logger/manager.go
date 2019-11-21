@@ -27,7 +27,7 @@ var (
 	arrLogger [MAX_LOGGERS]logger    // 所有logger信息
 	slice     map[string]interface{} = map[string]interface{}{}
 
-	chNl    chan []byte    = make(chan []byte, 1024*1024)
+	chNl    chan []byte    = make(chan []byte, 4096)
 	chFlush chan io.Writer = make(chan io.Writer)
 	chReLog chan struct{}  = make(chan struct{})
 	chItvl  chan struct{}  = make(chan struct{})
@@ -41,9 +41,9 @@ var (
 )
 
 func init() {
-	mFnFI = make(map[string]map[os.FileInfo]io.Writer, 1024) // file name -> file info
-	mFiles = make(map[io.Writer]string, 1024)                // io.Writer -> file name
-	mLoggers = make(map[io.Writer]map[*logger]struct{}, 1024)
+	mFnFI = make(map[string]map[os.FileInfo]io.Writer) // file name -> file info
+	mFiles = make(map[io.Writer]string)                // io.Writer -> file name
+	mLoggers = make(map[io.Writer]map[*logger]struct{})
 
 	mLogs[os.Stdout] = &logList{}
 	go logging()

@@ -9,6 +9,7 @@ type Logger interface {
 	SetLevel(level Level)
 	SetPrefix(prefix string)
 	Raw(v ...interface{})
+	Println(v ...interface{})
 	Trace(v ...interface{})
 	Debug(v ...interface{})
 	Info(v ...interface{})

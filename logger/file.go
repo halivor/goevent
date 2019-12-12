@@ -84,3 +84,15 @@ func reLog() {
 	}
 	locker.Unlock()
 }
+
+func reOpen() {
+	locker.Lock()
+	for w, fn := range mFiles {
+		if fp, ok := w.(*os.File); ok {
+			fp.Close()
+			nfp, _ := os.OpenFile(fn, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+			*fp = *nfp
+		}
+	}
+	locker.Unlock()
+}

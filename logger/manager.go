@@ -51,8 +51,11 @@ func init() {
 
 func logging() {
 	t := time.NewTicker(flushMsecs)
+	tr := time.NewTicker(time.Hour)
 	for {
 		select {
+		case <-tr.C:
+			reOpen()
 		case w := <-chFlush:
 			switch {
 			case w == nil:

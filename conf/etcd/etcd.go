@@ -43,22 +43,22 @@ func (c *conn) Init(params map[string]interface{}) {
 	}
 }
 
-func (c *conn) Get(key string) []byte {
+func (c *conn) Get(key string) map[string]conf.Value {
 	rc, e := c.cc.Get(context.TODO(), key)
 	if e != nil {
 		return nil
 	}
 
-	var data []byte
+	mp := map[string]conf.Value{}
 	for _, kv := range rc.Kvs {
-		data = kv.Value
+		mp[string(kv.Key)] = &data{event: conf.EVENT_ADD, kv: kv}
 	}
-	return data
+	return mp
 }
 
-func (c *conn) Watch(key string) <-chan map[string][]byte {
-	ch := make(chan map[string][]byte, 1)
-	go func(key string, ch chan map[string][]byte) {
+func (c *conn) Watch(key string) <-chan map[string]conf.Value {
+	ch := make(chan map[string]conf.Value, 1)
+	go func(key string, ch chan map[string]conf.Value) {
 		defer close(ch)
 		wc := c.cc.Watch(context.Background(), key)
 		for {
@@ -69,26 +69,28 @@ func (c *conn) Watch(key string) <-chan map[string][]byte {
 					wc = c.cc.Watch(context.Background(), key)
 					continue
 				}
-				data := map[string][]byte{}
+				md := map[string]conf.Value{}
 				for _, ev := range rc.Events {
+					evt := conf.EVENT_DEL
 					switch { //TODO: 记录一下日志
 					case ev.IsCreate():
+						evt = conf.EVENT_ADD
 					case ev.IsModify():
-					default: // delete
+						evt = conf.EVENT_MOD
 					}
-					data[string(ev.Kv.Key)] = ev.Kv.Value
+					md[string(ev.Kv.Key)] = &data{event: evt, kv: ev.Kv}
 				}
 				if c.invalide(ch) {
 					return
 				}
-				ch <- data
+				ch <- md
 			}
 		}
 	}(key, ch)
 	return ch
 }
 
-func (c *conn) invalide(ch <-chan map[string][]byte) bool {
+func (c *conn) invalide(ch <-chan map[string]conf.Value) bool {
 	if len(ch) >= cap(ch) {
 		return true
 	}

@@ -4,11 +4,25 @@ import (
 	"sync"
 )
 
+type EventType int32
+
+type Value interface {
+	Event() EventType
+	Data() []byte
+	String() string
+}
+
+const (
+	EVENT_ADD EventType = 1 << iota
+	EVENT_MOD
+	EVENT_DEL
+)
+
 type service interface {
 	Init(map[string]interface{})
-	Get(key string) []byte
+	Get(key string) map[string]Value
 	Put(key, val string)
-	Watch(key string) <-chan map[string][]byte
+	Watch(key string) <-chan map[string]Value
 	Lock(key string)
 	Unlock(key string)
 }
@@ -41,7 +55,7 @@ func Init(params map[string]interface{}) {
 	s.Init(params)
 }
 
-func Get(key string) []byte {
+func Get(key string) map[string]Value {
 	return s.Get(key)
 }
 
@@ -49,7 +63,7 @@ func Put(key, value string) {
 	s.Put(key, value)
 }
 
-func Watch(key string) <-chan map[string][]byte {
+func Watch(key string) <-chan map[string]Value {
 	return s.Watch(key)
 }
 

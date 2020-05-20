@@ -1,9 +1,10 @@
 package connection
 
 import (
-	"log"
 	"os"
 	"syscall"
+
+	log "github.com/halivor/goutil/logger"
 )
 
 const (
@@ -19,7 +20,7 @@ type c struct {
 	wb []buffer // cached buffer
 	wp int      // first buffer start position
 
-	*log.Logger
+	log.Logger
 }
 
 func (c *c) Send(data []byte) (int, error) {

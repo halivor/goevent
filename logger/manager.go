@@ -7,7 +7,7 @@ import (
 	"time"
 	"unsafe"
 
-	bp "github.com/halivor/goutility/bufferpool"
+	bp "github.com/halivor/goutil/bufferpool"
 )
 
 type logList struct {

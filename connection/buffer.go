@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"syscall"
 
-	cnf "github.com/halivor/sunshine/config"
+	log "github.com/halivor/goutil/logger"
 )
 
 type buffer interface {
@@ -24,11 +24,12 @@ type BConn interface {
 func NewConnWithBuffer(fd int) BConn {
 	SetSndBuf(fd, DEFAULT_BUFFER_SIZE)
 	SetRcvBuf(fd, DEFAULT_BUFFER_SIZE)
+	prefix := fmt.Sprintf("[sock(%d)] ", fd)
 	return &c{
 		fd:     fd,
 		ss:     ESTAB,
 		wb:     make([]buffer, 0, MAX_SENDQ_SIZE),
-		Logger: cnf.NewLogger(fmt.Sprintf("[sock(%d)] ", fd)),
+		Logger: log.NewLog("sock.log", prefix, log.LstdFlags, log.WARN),
 	}
 }
 
@@ -39,10 +40,12 @@ func NewTcpConnWithBuffer() (*c, error) {
 	}
 	SetSndBuf(fd, DEFAULT_BUFFER_SIZE)
 	SetRcvBuf(fd, DEFAULT_BUFFER_SIZE)
+	prefix := fmt.Sprintf("[tcp(%d)] ", fd)
 	return &c{
 		fd:     fd,
 		ss:     CREATE,
 		wb:     make([]buffer, 0, MAX_SENDQ_SIZE),
-		Logger: cnf.NewLogger(fmt.Sprintf("[tcp(%d)] ", fd)),
+		Logger: log.NewLog("tcp.log", prefix, log.LstdFlags, log.WARN),
 	}, nil
+	//cnf.NewLogger()
 }

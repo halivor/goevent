@@ -9,7 +9,7 @@ import (
 	"time"
 	"unsafe"
 
-	bp "github.com/halivor/goutility/bufferpool"
+	bp "github.com/halivor/goutil/bufferpool"
 )
 
 const ID_LEN = int(unsafe.Sizeof(int(1)))

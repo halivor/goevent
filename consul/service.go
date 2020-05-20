@@ -15,12 +15,3 @@ func (c *Consul) AddService() {
 		EnableTagOverride: false,
 	})
 }
-
-func (c *Consul) WatchService(tag string) {
-}
-
-func (c *Consul) Get() {
-}
-
-func (c *Consul) GetAllSvc() {
-}

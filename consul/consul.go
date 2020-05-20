@@ -1,12 +1,14 @@
 package consul
 
 import (
+	"sync"
 	"time"
 
 	"github.com/hashicorp/consul/api"
 )
 
 type Consul struct {
+	Proj     string
 	ID       string
 	Name     string
 	Tags     []string
@@ -18,9 +20,12 @@ type Consul struct {
 
 	*api.Client
 	kv
+	stat
+	Index sync.Map
 }
 
 type Config struct {
+	Proj string
 	ID   string
 	Name string
 	IP   string
@@ -52,6 +57,7 @@ func New(address, proto string) *Consul {
 }
 
 func (c *Consul) AddConf(cfg *Config) {
+	c.Proj = cfg.Proj
 	c.ID = cfg.ID
 	c.Name = cfg.Name
 	c.Tags = cfg.Tags
@@ -88,4 +94,12 @@ func (c *Consul) SetIP(ip string) {
 
 func (c *Consul) SetPort(port int) {
 	c.Port = port
+}
+
+func (c *Consul) getIdx(key string) uint64 {
+	if idx, ok := c.Index.Load(key); ok {
+		return idx.(uint64)
+	}
+
+	return 1
 }

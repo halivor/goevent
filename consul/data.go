@@ -8,7 +8,6 @@ import (
 )
 
 type kv struct {
-	Index sync.Map
 	Watch sync.Map // TODO: 在watch中的key可以直接读取
 	KVs   sync.Map
 	Keys  sync.Map
@@ -20,7 +19,7 @@ func (c *Consul) GetKVs(prefix string) map[string]string {
 		return kvs.(map[string]string)
 	}
 	keys, meta, _ := c.KV().List(prefix, &api.QueryOptions{})
-	c.kv.Index.Store(prefix, meta.LastIndex)
+	c.Index.Store(prefix, meta.LastIndex)
 	kvs := make(map[string]string, len(keys))
 	for _, key := range keys {
 		kvs[key.Key] = string(key.Value)
@@ -36,7 +35,7 @@ func (c *Consul) GetVal(key string) string {
 
 	kv, meta, _ := c.KV().Get(key, nil)
 	c.kv.Vals.Store(key, string(kv.Value))
-	c.kv.Index.Store(key, meta.LastIndex)
+	c.Index.Store(key, meta.LastIndex)
 	return string(kv.Value)
 }
 
@@ -58,28 +57,18 @@ func (c *Consul) WatchKVs(prefix string) (<-chan map[string]string, chan struct{
 					return
 				}
 
-				isrc, ok := c.kv.Keys.Load(key)
-				src, iok := isrc.(map[string]string)
-				if ok && iok && len(src) == len(dst) && KVsEqual(src, dst) {
+				isrc, iok := c.kv.KVs.Load(key)
+				src, ok := isrc.(map[string]string)
+				if iok && ok && KVsEqual(src, dst) {
 					continue
 				}
-				c.kv.Keys.Store(prefix, dst)
+				c.kv.KVs.Store(prefix, dst)
 				cb <- dst
 			}
 		}
 	}(prefix, cb, stop)
 
 	return cb, stop
-}
-
-func (c *Consul) getIdx(key string) uint64 {
-	if idx, ok := c.kv.Index.Load(key); ok {
-		return idx.(uint64)
-	}
-
-	_, meta, _ := c.KV().Get(key, nil)
-	c.kv.Index.Store(key, meta.LastIndex)
-	return meta.LastIndex
 }
 
 func (c *Consul) watchKey(key string) (map[string]string, error) {
@@ -94,7 +83,7 @@ func (c *Consul) watchKey(key string) (map[string]string, error) {
 	for _, kv := range kvs {
 		dst[kv.Key] = string(kv.Value)
 	}
-	c.kv.Index.Store(key, meta.LastIndex)
+	c.Index.Store(key, meta.LastIndex)
 	return dst, nil
 }
 
@@ -109,10 +98,25 @@ func (c *Consul) GetKeys(prefix string) map[string]struct{} {
 		mks[key] = struct{}{}
 	}
 	c.kv.Keys.Store(prefix, mks)
-	c.kv.Index.Store(prefix, meta.LastIndex)
+	c.Index.Store(prefix, meta.LastIndex)
 	return mks
 }
 
 func KVsEqual(src, dst map[string]string) bool {
-	return false
+	for k, vs := range src {
+		if vd, ok := dst[k]; !ok || vd != vs {
+			return false
+		}
+	}
+
+	if len(src) == len(dst) {
+		return true
+	}
+
+	for k, vd := range dst {
+		if vs, ok := src[k]; !ok || vs != vd {
+			return false
+		}
+	}
+	return true
 }

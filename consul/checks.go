@@ -45,6 +45,3 @@ func (c *Consul) AddHttpCheck(note string, path string,
 		},
 	})
 }
-
-func (c *Consul) WatchChecks(tag string) {
-}

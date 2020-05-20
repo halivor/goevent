@@ -18,7 +18,7 @@ type Consul struct {
 	IP   string
 	Port int
 
-	*api.Client
+	cc *api.Client
 	kv
 	stat
 	Index sync.Map
@@ -34,25 +34,31 @@ type Config struct {
 	Meta map[string]string
 }
 
-func New(address, proto string) *Consul {
+func New() *Consul {
+	return &Consul{
+		WaitTime: time.Minute * 15,
+	}
+}
+
+func (c *Consul) Init(params map[string]interface{}) {
 	addr := "127.0.0.1:8500"
-	if len(address) != 0 {
+	if address, ok := params["addr"].(string); ok {
 		addr = address
 	}
 	scheme := "http"
-	if len(proto) == 0 {
+	if proto, ok := params["proto"].(string); ok {
 		scheme = proto
 	}
-	clnt, e := api.NewClient(&api.Config{
+	var e error
+	if c.cc, e = api.NewClient(&api.Config{
 		Address: addr,
 		Scheme:  scheme,
-	})
-	if e != nil {
+	}); e != nil {
 		panic(e)
 	}
-	return &Consul{
-		WaitTime: time.Minute * 15,
-		Client:   clnt,
+
+	if tmo, ok := params["waittime"].(time.Duration); ok && tmo > 0 {
+		c.WaitTime = tmo
 	}
 }
 

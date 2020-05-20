@@ -7,7 +7,7 @@ import (
 )
 
 func (c *Consul) AddTcpCheck(note string) {
-	c.Agent().CheckRegister(&api.AgentCheckRegistration{
+	c.cc.Agent().CheckRegister(&api.AgentCheckRegistration{
 		ID:        c.ID,
 		Name:      c.Name,
 		Notes:     note,
@@ -26,7 +26,7 @@ func (c *Consul) AddTcpCheck(note string) {
 
 func (c *Consul) AddHttpCheck(note string, path string,
 	method string, header map[string][]string, body string) {
-	c.Agent().CheckRegister(&api.AgentCheckRegistration{
+	c.cc.Agent().CheckRegister(&api.AgentCheckRegistration{
 		ID:        c.ID,
 		Name:      c.Name,
 		Notes:     note,
@@ -44,4 +44,10 @@ func (c *Consul) AddHttpCheck(note string, path string,
 			DeregisterCriticalServiceAfter: "5m",
 		},
 	})
+}
+
+func (c *Consul) Lock(key string) {
+}
+
+func (c *Consul) Unlock(key string) {
 }

@@ -15,7 +15,7 @@ func (c *Consul) GetStat(svc string) {
 	if _, ok := c.Svcs.Load(svc); ok {
 		return
 	}
-	hc, meta, _ := c.Health().State("passing", &api.QueryOptions{
+	hc, meta, _ := c.cc.Health().State("passing", &api.QueryOptions{
 		Filter: c.Proj + " in ServiceTags and " + svc + " in ServiceTags",
 	})
 	c.Index.Store(svc, meta.LastIndex)
@@ -56,7 +56,7 @@ func (c *Consul) WatchStat(svc string) (<-chan map[string]*api.HealthCheck, chan
 func (c *Consul) watchStat(svc string) (map[string]*api.HealthCheck, error) {
 	idx := c.getIdx(svc)
 	filter := c.Proj + " in ServiceTags and " + svc + " in ServiceTags"
-	ss, meta, e := c.Health().State(svc, &api.QueryOptions{
+	ss, meta, e := c.cc.Health().State(svc, &api.QueryOptions{
 		WaitIndex: idx,
 		WaitTime:  time.Minute,
 		Filter:    filter,

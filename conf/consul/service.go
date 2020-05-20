@@ -5,7 +5,7 @@ import (
 )
 
 func (c *Consul) AddService() {
-	c.Agent().ServiceRegister(&api.AgentServiceRegistration{
+	c.cc.Agent().ServiceRegister(&api.AgentServiceRegistration{
 		ID:                c.ID,
 		Name:              c.Name,
 		Tags:              c.Tags,

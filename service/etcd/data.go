@@ -1,19 +1,19 @@
 package etcd
 
 import (
-	"github.com/halivor/goutil/conf"
+	svc "github.com/halivor/goutil/service"
 	"go.etcd.io/etcd/mvcc/mvccpb"
 )
 
 type data struct {
-	event conf.EventType
+	event svc.EventType
 	kv    *mvccpb.KeyValue
 }
 
 func (x *data) Data() []byte {
 	return x.kv.Value
 }
-func (x *data) Event() conf.EventType {
+func (x *data) Event() svc.EventType {
 	return x.event
 }
 

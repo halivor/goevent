@@ -1,15 +1,15 @@
 package consul
 
 import (
-	"github.com/halivor/goutil/conf"
+	svc "github.com/halivor/goutil/service"
 )
 
 type data struct {
-	ev   conf.EventType
+	ev   svc.EventType
 	data []byte
 }
 
-func (x *data) Event() conf.EventType {
+func (x *data) Event() svc.EventType {
 	return x.ev
 }
 

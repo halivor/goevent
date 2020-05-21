@@ -4,9 +4,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/halivor/goutil/conf"
+	svc "github.com/halivor/goutil/service"
 	"github.com/hashicorp/consul/api"
 )
+
+func init() {
+	svc.Register("consul", New())
+}
 
 type kv struct {
 	Watch sync.Map // TODO: 在watch中的key可以直接读取
@@ -29,18 +33,18 @@ func (c *Consul) GetKVs(prefix string) map[string]string {
 	return kvs
 }
 
-func (c *Consul) Get(key string) map[string]conf.Value {
+func (c *Consul) Get(key string) map[string]svc.Value {
 	kv, meta, _ := c.cc.KV().Get(key, nil)
 	c.kv.Vals.Store(key, string(kv.Value))
 	c.Index.Store(key, meta.LastIndex)
-	return map[string]conf.Value{
-		key: &data{ev: conf.EVENT_ADD, data: kv.Value},
+	return map[string]svc.Value{
+		key: &data{ev: svc.EVENT_ADD, data: kv.Value},
 	}
 }
 
-func (c *Consul) Watch(prefix string) <-chan map[string]conf.Value {
-	cb := make(chan map[string]conf.Value)
-	go func(key string, ch chan map[string]conf.Value) {
+func (c *Consul) Watch(prefix string) <-chan map[string]svc.Value {
+	cb := make(chan map[string]svc.Value)
+	go func(key string, ch chan map[string]svc.Value) {
 		for {
 			dst, e := c.watch(key)
 			if e != nil {
@@ -49,7 +53,7 @@ func (c *Consul) Watch(prefix string) <-chan map[string]conf.Value {
 			}
 
 			isrc, iok := c.kv.KVs.Load(key)
-			src, ok := isrc.(map[string]conf.Value)
+			src, ok := isrc.(map[string]svc.Value)
 			if iok && ok && KVbEqual(src, dst) {
 				continue
 			}
@@ -93,7 +97,7 @@ func (c *Consul) WatchKVs(prefix string) (<-chan map[string]string, chan struct{
 	return cb, stop
 }
 
-func (c *Consul) watch(key string) (map[string]conf.Value, error) {
+func (c *Consul) watch(key string) (map[string]svc.Value, error) {
 	idx := c.getIdx(key)
 	kvs, meta, e := c.cc.KV().List(key, &api.QueryOptions{
 		WaitIndex: idx, WaitTime: time.Minute,
@@ -101,7 +105,7 @@ func (c *Consul) watch(key string) (map[string]conf.Value, error) {
 	if e != nil {
 		return nil, e
 	}
-	dst := make(map[string]conf.Value, len(kvs))
+	dst := make(map[string]svc.Value, len(kvs))
 	for _, kv := range kvs {
 		dst[kv.Key] = &data{data: kv.Value}
 	}
@@ -160,7 +164,7 @@ func KVsEqual(src, dst map[string]string) bool {
 }
 
 // TODO: 优化event type处理
-func KVbEqual(src, dst map[string]conf.Value) bool {
+func KVbEqual(src, dst map[string]svc.Value) bool {
 	for k, vs := range src {
 		if vd, ok := dst[k]; !ok || vd.String() != vs.String() {
 			return false

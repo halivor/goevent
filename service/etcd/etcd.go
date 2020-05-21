@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/halivor/goutil/conf"
+	svc "github.com/halivor/goutil/service"
 	api "go.etcd.io/etcd/clientv3"
 	apicc "go.etcd.io/etcd/clientv3/concurrency"
 )
@@ -19,7 +19,7 @@ type conn struct {
 var mtx sync.Mutex
 
 func init() {
-	conf.Register("etcd", &conn{mtx: map[string]*apicc.Mutex{}})
+	svc.Register("etcd", &conn{mtx: map[string]*apicc.Mutex{}})
 }
 
 func (c *conn) Init(params interface{}) {
@@ -43,22 +43,22 @@ func (c *conn) Init(params interface{}) {
 	}
 }
 
-func (c *conn) Get(key string) map[string]conf.Value {
+func (c *conn) Get(key string) map[string]svc.Value {
 	rc, e := c.cc.Get(context.TODO(), key)
 	if e != nil {
 		return nil
 	}
 
-	mp := map[string]conf.Value{}
+	mp := map[string]svc.Value{}
 	for _, kv := range rc.Kvs {
-		mp[string(kv.Key)] = &data{event: conf.EVENT_ADD, kv: kv}
+		mp[string(kv.Key)] = &data{event: svc.EVENT_ADD, kv: kv}
 	}
 	return mp
 }
 
-func (c *conn) Watch(key string) <-chan map[string]conf.Value {
-	ch := make(chan map[string]conf.Value, 1)
-	go func(key string, ch chan map[string]conf.Value) {
+func (c *conn) Watch(key string) <-chan map[string]svc.Value {
+	ch := make(chan map[string]svc.Value, 1)
+	go func(key string, ch chan map[string]svc.Value) {
 		defer close(ch)
 		wc := c.cc.Watch(context.Background(), key)
 		for {
@@ -69,14 +69,14 @@ func (c *conn) Watch(key string) <-chan map[string]conf.Value {
 					wc = c.cc.Watch(context.Background(), key)
 					continue
 				}
-				md := map[string]conf.Value{}
+				md := map[string]svc.Value{}
 				for _, ev := range rc.Events {
-					evt := conf.EVENT_DEL
+					evt := svc.EVENT_DEL
 					switch { //TODO: 记录一下日志
 					case ev.IsCreate():
-						evt = conf.EVENT_ADD
+						evt = svc.EVENT_ADD
 					case ev.IsModify():
-						evt = conf.EVENT_MOD
+						evt = svc.EVENT_MOD
 					}
 					md[string(ev.Kv.Key)] = &data{event: evt, kv: ev.Kv}
 				}
@@ -90,7 +90,7 @@ func (c *conn) Watch(key string) <-chan map[string]conf.Value {
 	return ch
 }
 
-func (c *conn) invalide(ch <-chan map[string]conf.Value) bool {
+func (c *conn) invalide(ch <-chan map[string]svc.Value) bool {
 	if len(ch) >= cap(ch) {
 		return true
 	}

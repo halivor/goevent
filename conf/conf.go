@@ -28,48 +28,38 @@ type service interface {
 }
 
 var (
-	s    service
-	mtx  sync.Mutex
-	svcs = map[string]service{}
+	svc service
+	mtx sync.Mutex
 )
 
-func Register(name string, svc service) {
-	svcs[name] = svc
-}
-
-func Use(name string) {
-	mtx.Lock()
-	defer mtx.Unlock()
-	if _, ok := svcs[name]; !ok {
-		panic(name + " not exists")
-	}
-	s = svcs[name]
+func Register(name string, s service) {
+	svc = s
 }
 
 func Init(params map[string]interface{}) {
 	mtx.Lock()
 	defer mtx.Unlock()
-	if s == nil {
+	if svc == nil {
 		panic("unused service")
 	}
-	s.Init(params)
+	svc.Init(params)
 }
 
 func Get(key string) map[string]Value {
-	return s.Get(key)
+	return svc.Get(key)
 }
 
 func Put(key, value string) {
-	s.Put(key, value)
+	svc.Put(key, value)
 }
 
 func Watch(key string) <-chan map[string]Value {
-	return s.Watch(key)
+	return svc.Watch(key)
 }
 
 func Lock(key string) {
-	s.Lock(key)
+	svc.Lock(key)
 }
 func Unlock(key string) {
-	s.Unlock(key)
+	svc.Unlock(key)
 }

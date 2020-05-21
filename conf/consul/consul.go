@@ -40,7 +40,8 @@ func New() *Consul {
 	}
 }
 
-func (c *Consul) Init(params map[string]interface{}) {
+func (c *Consul) Init(param interface{}) {
+	params := param.(map[string]interface{})
 	addr := "127.0.0.1:8500"
 	if address, ok := params["addr"].(string); ok {
 		addr = address

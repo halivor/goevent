@@ -19,7 +19,7 @@ const (
 )
 
 type service interface {
-	Init(map[string]interface{})
+	Init(interface{})
 	Get(key string) map[string]Value
 	Put(key, val string)
 	Watch(key string) <-chan map[string]Value
@@ -36,7 +36,7 @@ func Register(name string, s service) {
 	svc = s
 }
 
-func Init(params map[string]interface{}) {
+func Init(params interface{}) {
 	mtx.Lock()
 	defer mtx.Unlock()
 	if svc == nil {

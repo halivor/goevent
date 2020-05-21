@@ -14,7 +14,7 @@ func InIpv4() ([]string, error) {
 		for _, address := range addrs {
 			// 检查ip地址判断是否回环地址
 			if ipnet, ok := address.(*net.IPNet); ok {
-				if ipnet.IP.To4() != nil && !ipnet.IP.IsLoopback() {
+				if ipnet.IP.To4() != nil && !ipnet.IP.IsLoopback() && ipnet.IP.To4()[0] != 172 {
 					ip := ipnet.IP.To4().String()
 					ips = append(ips, ip)
 				}

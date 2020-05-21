@@ -22,14 +22,14 @@ func init() {
 	conf.Register("etcd", &conn{mtx: map[string]*apicc.Mutex{}})
 }
 
-func (c *conn) Init(params map[string]interface{}) {
+func (c *conn) Init(params interface{}) {
 	mtx.Lock()
 	defer mtx.Unlock()
 	if c.cc != nil {
 		return
 	}
 
-	eps := params["hosts"].([]string)
+	eps := params.([]string)
 	if len(eps) == 0 {
 		eps = []string{"127.0.0.1:2379"}
 	}

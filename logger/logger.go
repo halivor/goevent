@@ -19,6 +19,11 @@ type Logger interface {
 	FlushAll()
 }
 
+func NewLogWithConf(conf *Conf) Logger {
+	return NewLog(conf.Name, conf.Prefix,
+		StrToFlag(conf.Flag), StrToLvl(conf.Level))
+}
+
 func NewLog(file string, prefix string, flag int, level Level) Logger {
 	switch l, e := newLogger(gPath + file); {
 	case e != nil:

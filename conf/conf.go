@@ -7,12 +7,12 @@ import (
 )
 
 var (
-	svc s.Service
+	sc  s.Service
 	mtx sync.Mutex
 )
 
 func Use(name string) {
-	if svc = s.Get(name); svc == nil {
+	if sc = s.Get(name); sc == nil {
 		panic("service not exist")
 	}
 }
@@ -20,17 +20,19 @@ func Use(name string) {
 func Init(params interface{}) {
 	mtx.Lock()
 	defer mtx.Unlock()
-	svc.Init(params)
+	sc.Init(params)
 }
 
 func Get(key string) map[string]s.Value {
-	return svc.Get(key)
+	mtx.Lock()
+	defer mtx.Unlock()
+	return sc.Get(key)
 }
 
 func Put(key, value string) {
-	svc.Put(key, value)
+	sc.Put(key, value)
 }
 
 func Watch(key string) <-chan map[string]s.Value {
-	return svc.Watch(key)
+	return sc.Watch(key)
 }

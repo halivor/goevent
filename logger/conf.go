@@ -43,13 +43,13 @@ var (
 		"WARN":  WARN,
 	}
 	strFlag map[string]int = map[string]int{
-		"Ldate":         Ldate,
-		"Ltime":         Ltime,
-		"Lmicroseconds": Lmicroseconds,
-		"Llongfile":     Llongfile,
-		"Lshortfile":    Lshortfile,
+		"LDATE":         Ldate,
+		"LTIME":         Ltime,
+		"LMICROSECONDS": Lmicroseconds,
+		"LLONGFILE":     Llongfile,
+		"LSHORTFILE":    Lshortfile,
 		"LUTC":          LUTC,
-		"LstdFlags":     LstdFlags,
+		"LSTDFLAGS":     LstdFlags,
 	}
 	gPath      string
 	flushMsecs time.Duration = 500 * time.Millisecond
@@ -59,7 +59,7 @@ func StrToFlag(flags string) int {
 	var Flags = 0
 	fields := strings.Split(flags, "|")
 	for _, field := range fields {
-		if flag, ok := strFlag[strings.TrimSpace(field)]; ok {
+		if flag, ok := strFlag[strings.ToUpper(strings.TrimSpace(field))]; ok {
 			Flags |= flag
 		}
 	}
@@ -67,7 +67,7 @@ func StrToFlag(flags string) int {
 }
 
 func StrToLvl(level string) Level {
-	if lvl, ok := strLevel[level]; ok {
+	if lvl, ok := strLevel[strings.ToUpper(strings.TrimSpace(level))]; ok {
 		return lvl
 	}
 	return DEBUG
@@ -83,4 +83,11 @@ func SetGlobalPath(path string) {
 func SetFlushMsecs(msec int) {
 	flushMsecs = time.Duration(msec) * time.Millisecond
 	chItvl <- struct{}{}
+}
+
+type Conf struct {
+	Name   string `json:"name"`
+	Prefix string `json:"prefix"`
+	Level  string `json:"level"`
+	Flag   string `json:"flag"`
 }

@@ -19,7 +19,11 @@ type conn struct {
 var mtx sync.Mutex
 
 func init() {
-	svc.Register("etcd", &conn{mtx: map[string]*apicc.Mutex{}})
+	svc.Register("etcd", New())
+}
+
+func New() *conn {
+	return &conn{mtx: map[string]*apicc.Mutex{}}
 }
 
 func (c *conn) Init(params interface{}) {

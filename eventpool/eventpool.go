@@ -5,7 +5,7 @@ import (
 	"syscall"
 	"time"
 
-	log "github.com/halivor/goutility/logger"
+	log "github.com/halivor/goutil/logger"
 )
 
 type EventPool interface {

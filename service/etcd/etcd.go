@@ -2,10 +2,13 @@ package etcd
 
 import (
 	"context"
-	_ "fmt"
+	"fmt"
 	"sync"
 	"time"
 
+	"github.com/golang/protobuf/proto"
+	cp "github.com/halivor/common/golang/packet"
+	ce "github.com/halivor/common/golang/util/errno"
 	svc "github.com/halivor/goutil/service"
 	api "go.etcd.io/etcd/clientv3"
 	apicc "go.etcd.io/etcd/clientv3/concurrency"
@@ -13,22 +16,48 @@ import (
 
 type conn struct {
 	cc  *api.Client
+	rw  sync.RWMutex
 	mtx map[string]*apicc.Mutex
+	mms map[string]svc.Method
 }
-
-var mtx sync.Mutex
 
 func init() {
 	svc.Register("etcd", New())
 }
 
 func New() *conn {
-	return &conn{mtx: map[string]*apicc.Mutex{}}
+	return &conn{
+		mtx: map[string]*apicc.Mutex{},
+		mms: make(map[string]svc.Method, 64),
+	}
+}
+
+func (c *conn) SetUp(name string, m svc.Method) {
+	c.rw.Lock()
+	defer c.rw.Unlock()
+	c.mms[name] = m
+	// TODO: 同步服务注册
+}
+
+func (c *conn) Call(name string, req proto.Message, rsp proto.Message) ce.Errno {
+	c.rw.RLock()
+	m, ok := c.mms[name]
+	c.rw.RUnlock()
+	if !ok {
+		return ce.DATA_INVALID
+	}
+	rst, e := m(context.Background(), cp.NewRequest(req))
+	if e != nil {
+		fmt.Println(e)
+		return ce.SRV_ERR
+	}
+	proto.Unmarshal(rst.GetBody(), rsp)
+	return ce.Errno(rst.Errno)
 }
 
 func (c *conn) Init(params interface{}) {
-	mtx.Lock()
-	defer mtx.Unlock()
+	c.rw.Lock()
+	defer c.rw.Unlock()
 	if c.cc != nil {
 		return
 	}

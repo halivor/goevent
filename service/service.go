@@ -1,11 +1,19 @@
 package service
 
 import (
+	"context"
 	"sync"
+
+	"github.com/golang/protobuf/proto"
+	cp "github.com/halivor/common/golang/packet"
+	ce "github.com/halivor/common/golang/util/errno"
+	"google.golang.org/grpc"
 )
 
 type EventType int32
 
+//type Method func(context.Context, *cp.Request) (*cp.Response, error)
+type Method func(ctx context.Context, in *cp.Request, opts ...grpc.CallOption) (*cp.Response, error)
 type Value interface {
 	Event() EventType
 	Data() []byte
@@ -25,6 +33,8 @@ type Service interface {
 	Watch(key string) <-chan map[string]Value
 	Lock(key string)
 	Unlock(key string)
+	SetUp(name string, m Method)
+	Call(name string, req proto.Message, rsp proto.Message) ce.Errno
 }
 
 var (

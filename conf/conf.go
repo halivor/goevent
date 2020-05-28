@@ -3,16 +3,18 @@ package conf
 import (
 	"sync"
 
-	s "github.com/halivor/goutil/service"
+	"github.com/golang/protobuf/proto"
+	ce "github.com/halivor/common/golang/util/errno"
+	us "github.com/halivor/goutil/service"
 )
 
 var (
-	sc  s.Service
+	svc us.Service
 	mtx sync.Mutex
 )
 
 func Use(name string) {
-	if sc = s.Get(name); sc == nil {
+	if svc = us.Get(name); svc == nil {
 		panic("service not exist")
 	}
 }
@@ -20,19 +22,27 @@ func Use(name string) {
 func Init(params interface{}) {
 	mtx.Lock()
 	defer mtx.Unlock()
-	sc.Init(params)
+	svc.Init(params)
 }
 
-func Get(key string) map[string]s.Value {
+func Get(key string) map[string]us.Value {
 	mtx.Lock()
 	defer mtx.Unlock()
-	return sc.Get(key)
+	return svc.Get(key)
 }
 
 func Put(key, value string) {
-	sc.Put(key, value)
+	svc.Put(key, value)
 }
 
-func Watch(key string) <-chan map[string]s.Value {
-	return sc.Watch(key)
+func Watch(key string) <-chan map[string]us.Value {
+	return svc.Watch(key)
+}
+
+func SignInSvc(name string, m us.Method) {
+	svc.SetUp(name, m)
+}
+
+func Call(name string, req proto.Message, rsp proto.Message) ce.Errno {
+	return svc.Call(name, req, rsp)
 }

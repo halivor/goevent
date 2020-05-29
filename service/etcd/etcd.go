@@ -19,6 +19,7 @@ type conn struct {
 	rw  sync.RWMutex
 	mtx map[string]*apicc.Mutex
 	mms map[string]svc.Method
+	mec map[string]*svc.Entry
 }
 
 func init() {
@@ -29,6 +30,7 @@ func New() *conn {
 	return &conn{
 		mtx: map[string]*apicc.Mutex{},
 		mms: make(map[string]svc.Method, 64),
+		mec: make(map[string]*svc.Entry, 64),
 	}
 }
 

@@ -12,8 +12,6 @@ import (
 
 type EventType int32
 
-//type Method func(context.Context, *cp.Request) (*cp.Response, error)
-type Method func(ctx context.Context, in *cp.Request, opts ...grpc.CallOption) (*cp.Response, error)
 type Value interface {
 	Event() EventType
 	Data() []byte
@@ -25,6 +23,9 @@ const (
 	EVENT_MOD
 	EVENT_DEL
 )
+
+// TODO: method to interface, when call to conver http/grpc call
+type Method func(ctx context.Context, in *cp.Request, opts ...grpc.CallOption) (*cp.Response, error)
 
 type Service interface {
 	Init(interface{})

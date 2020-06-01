@@ -86,8 +86,8 @@ func SetFlushMsecs(msec int) {
 }
 
 type Conf struct {
-	Name   string `json:"name"`
-	Prefix string `json:"prefix"`
-	Level  string `json:"level"`
-	Flag   string `json:"flag"`
+	Name   string `json:"name,omitempty"`
+	Prefix string `json:"prefix,omitempty"`
+	Level  string `json:"level,omitempty"`
+	Flag   string `json:"flag,omitempty"`
 }

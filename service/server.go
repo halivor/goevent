@@ -11,6 +11,7 @@ type http struct {
 }
 
 type server struct {
+	// TODO: 增加接口调用超时
 	Key       string                     `json:"key"`
 	Service   string                     `json:"module"`
 	Host      string                     `json:"host"`

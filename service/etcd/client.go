@@ -1,6 +1,7 @@
 package etcd
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/golang/protobuf/proto"
@@ -36,7 +37,10 @@ func (c *conn) Call(srv, service string, req, rsp proto.Message) ce.Errno {
 	}
 	for clnt, _ := range c.mcs[srv] {
 		rets := reflect.ValueOf(clnt.This).MethodByName(service).
-			Call([]reflect.Value{reflect.ValueOf(cp.NewRequest(req))})
+			Call([]reflect.Value{
+				reflect.ValueOf(context.TODO()),
+				reflect.ValueOf(cp.NewRequest(req)),
+			})
 		for _, ret := range rets {
 			switch v := ret.Interface().(type) {
 			case *cp.Response:

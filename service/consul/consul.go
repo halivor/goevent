@@ -4,6 +4,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/protobuf/proto"
+	ce "github.com/halivor/common/golang/util/errno"
+	svc "github.com/halivor/goutil/service"
 	"github.com/hashicorp/consul/api"
 )
 
@@ -34,7 +37,11 @@ type Config struct {
 	Meta map[string]string
 }
 
-func New() *Consul {
+func init() {
+	svc.Register("consul", New)
+}
+
+func New() svc.Service {
 	return &Consul{
 		WaitTime: time.Minute * 15,
 	}
@@ -109,4 +116,12 @@ func (c *Consul) getIdx(key string) uint64 {
 	}
 
 	return 1
+}
+
+func (c *Consul) SetUp(name string, m svc.Method) {
+}
+func (c *Consul) Call(name string, req proto.Message, rsp proto.Message) ce.Errno {
+	return ce.SUCC
+}
+func (c *Consul) SignUp(svc.Server) {
 }

@@ -36,17 +36,15 @@ type Service interface {
 	Unlock(key string)
 	SetUp(name string, m Method)
 	Call(name string, req proto.Message, rsp proto.Message) ce.Errno
+	SignUp(Server)
 }
 
 var (
-	msvc = map[string]Service{}
+	msvc = map[string]func() Service{}
 	mtx  sync.Mutex
 )
 
-func Add(key string, api map[string]string) {
-}
-
-func Register(name string, svc Service) {
+func Register(name string, svc func() Service) {
 	mtx.Lock()
 	defer mtx.Unlock()
 	msvc[name] = svc
@@ -55,11 +53,11 @@ func Register(name string, svc Service) {
 func Get(name string) Service {
 	mtx.Lock()
 	defer mtx.Unlock()
-	return msvc[name]
+	return msvc[name]()
 }
 
 func New(name string) Service {
 	mtx.Lock()
 	defer mtx.Unlock()
-	return msvc[name]
+	return msvc[name]()
 }

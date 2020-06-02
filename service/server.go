@@ -46,6 +46,6 @@ func (s *server) Key() string {
 }
 
 func (s *server) Data() string {
-	pb, _ := json.Marshal(s)
+	pb, _ := json.MarshalIndent(s, "", "    ")
 	return string(pb)
 }

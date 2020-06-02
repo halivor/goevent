@@ -8,10 +8,6 @@ import (
 	"github.com/hashicorp/consul/api"
 )
 
-func init() {
-	svc.Register("consul", New())
-}
-
 type kv struct {
 	Watch sync.Map // TODO: 在watch中的key可以直接读取
 	KVs   sync.Map

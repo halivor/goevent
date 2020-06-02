@@ -26,10 +26,10 @@ type conn struct {
 }
 
 func init() {
-	svc.Register("etcd", New())
+	svc.Register("etcd", New)
 }
 
-func New() *conn {
+func New() svc.Service {
 	return &conn{
 		mtx: map[string]*apicc.Mutex{},
 		mms: make(map[string]svc.Method, 64),

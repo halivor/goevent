@@ -34,9 +34,9 @@ type Service interface {
 	Watch(key string) <-chan map[string]Value
 	Lock(key string)
 	Unlock(key string)
-	SetUp(name string, m Method)
-	Call(name string, req proto.Message, rsp proto.Message) ce.Errno
 	SignUp(Server)
+	NewClnt(Server, interface{})
+	Call(string, string, proto.Message, proto.Message) ce.Errno
 }
 
 var (

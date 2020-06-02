@@ -5,5 +5,5 @@ import (
 )
 
 func (c *conn) SignUp(srv svc.Server) {
-	c.Put(srv.Key(), srv.Data())
+	c.Put(srv.GetKey(), srv.Data())
 }

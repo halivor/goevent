@@ -2,13 +2,13 @@ package etcd
 
 import (
 	"context"
-	"fmt"
+	_ "fmt"
 	"sync"
 	"time"
 
-	"github.com/golang/protobuf/proto"
-	cp "github.com/halivor/common/golang/packet"
-	ce "github.com/halivor/common/golang/util/errno"
+	_ "github.com/golang/protobuf/proto"
+	_ "github.com/halivor/common/golang/packet"
+	_ "github.com/halivor/common/golang/util/errno"
 	svc "github.com/halivor/goutil/service"
 	api "go.etcd.io/etcd/clientv3"
 	apicc "go.etcd.io/etcd/clientv3/concurrency"
@@ -21,8 +21,6 @@ type conn struct {
 	mms map[string]svc.Method
 	mec map[string]*svc.Entry
 	mcs map[string]map[*svc.Client]struct{}
-	mss map[string]*svc.Server
-	msm map[string][]string
 }
 
 func init() {
@@ -35,8 +33,6 @@ func New() svc.Service {
 		mms: make(map[string]svc.Method, 64),
 		mec: make(map[string]*svc.Entry, 64),
 		mcs: make(map[string]map[*svc.Client]struct{}, 32),
-		mss: make(map[string]*svc.Server, 32),
-		msm: make(map[string][]string, 32),
 	}
 }
 
@@ -61,37 +57,8 @@ func (c *conn) Init(params interface{}) {
 	}
 }
 
-func (c *conn) SetUp(name string, m svc.Method) {
-	c.rw.Lock()
-	defer c.rw.Unlock()
-	c.mms[name] = m
-	// TODO: 同步服务注册
-}
-
-func (c *conn) Call(name string, req proto.Message, rsp proto.Message) ce.Errno {
-	c.rw.RLock()
-	m, ok := c.mms[name]
-	c.rw.RUnlock()
-	if !ok {
-		return ce.DATA_INVALID
-	}
-	rst, e := m(context.Background(), cp.NewRequest(req))
-	if e != nil {
-		fmt.Println(e)
-		return ce.SRV_ERR
-	}
-	proto.Unmarshal(rst.GetBody(), rsp)
-	return ce.Errno(rst.Errno)
-}
-
-func (c *conn) NewSvc(addr string, name string) {
-}
-
-func (c *conn) SetSvc(name string, service string) {
-}
-
 func (c *conn) Get(key string) map[string]svc.Value {
-	rc, e := c.cc.Get(context.TODO(), key)
+	rc, e := c.cc.Get(context.TODO(), key, api.WithPrefix())
 	if e != nil {
 		return nil
 	}

@@ -1,6 +1,8 @@
 package service
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 type http struct {
 	Name   string `json:"name"`
@@ -9,43 +11,69 @@ type http struct {
 }
 
 type server struct {
-	key       string
-	Module    string                 `json:"module"`
-	Type      string                 `json:"type"`
-	Host      string                 `json:"host"`
-	Interface map[string]interface{} `json:"interface"`
+	Key       string                     `json:"key"`
+	Service   string                     `json:"module"`
+	Host      string                     `json:"host"`
+	Type      string                     `json:"type"`
+	Interface map[string]json.RawMessage `json:"interface"`
 }
 
 type Server interface {
 	AddGrpc(name string)
 	AddHttp(name, method, path string)
-	Key() string
 	Data() string
+	GetKey() string
+	GetService() string
+	GetHost() string
+	GetType() string
+	GetInterface() map[string]json.RawMessage
 }
 
-func NewServer(key, module, typ, host string) Server {
+func NewServer(key, service, typ, host string) Server {
 	return &server{
-		key:       key,
-		Type:      typ,
+		Key:       key,
+		Service:   service,
 		Host:      host,
-		Module:    module,
-		Interface: make(map[string]interface{}, 32),
+		Type:      typ,
+		Interface: make(map[string]json.RawMessage, 32),
 	}
 }
 
+func ParseServer(data []byte) Server {
+	s := &server{}
+	json.Unmarshal(data, s)
+	return s
+}
+
 func (s *server) AddHttp(name, method, path string) {
-	s.Interface[name] = &http{name, method, path}
+	s.Interface[name], _ = json.Marshal(&http{name, method, path})
 }
 
 func (s *server) AddGrpc(name string) {
-	s.Interface[name] = struct{}{}
-}
-
-func (s *server) Key() string {
-	return s.key
+	s.Interface[name] = []byte("{}")
 }
 
 func (s *server) Data() string {
 	pb, _ := json.MarshalIndent(s, "", "    ")
 	return string(pb)
+}
+
+func (s *server) GetKey() string {
+	return s.Key
+}
+
+func (s *server) GetService() string {
+	return s.Service
+}
+
+func (s *server) GetHost() string {
+	return s.Host
+}
+
+func (s *server) GetType() string {
+	return s.Type
+}
+
+func (s *server) GetInterface() map[string]json.RawMessage {
+	return s.Interface
 }

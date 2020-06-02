@@ -20,6 +20,9 @@ type conn struct {
 	mtx map[string]*apicc.Mutex
 	mms map[string]svc.Method
 	mec map[string]*svc.Entry
+	mcs map[string]map[*svc.Client]struct{}
+	mss map[string]*svc.Server
+	msm map[string][]string
 }
 
 func init() {
@@ -31,6 +34,30 @@ func New() *conn {
 		mtx: map[string]*apicc.Mutex{},
 		mms: make(map[string]svc.Method, 64),
 		mec: make(map[string]*svc.Entry, 64),
+		mcs: make(map[string]map[*svc.Client]struct{}, 32),
+		mss: make(map[string]*svc.Server, 32),
+		msm: make(map[string][]string, 32),
+	}
+}
+
+func (c *conn) Init(params interface{}) {
+	c.rw.Lock()
+	defer c.rw.Unlock()
+	if c.cc != nil {
+		return
+	}
+
+	eps := params.([]string)
+	if len(eps) == 0 {
+		eps = []string{"127.0.0.1:2379"}
+	}
+
+	var e error
+	if c.cc, e = api.New(api.Config{
+		Endpoints:   eps,
+		DialTimeout: time.Second * 3,
+	}); e != nil {
+		panic(e)
 	}
 }
 
@@ -57,25 +84,10 @@ func (c *conn) Call(name string, req proto.Message, rsp proto.Message) ce.Errno 
 	return ce.Errno(rst.Errno)
 }
 
-func (c *conn) Init(params interface{}) {
-	c.rw.Lock()
-	defer c.rw.Unlock()
-	if c.cc != nil {
-		return
-	}
+func (c *conn) NewSvc(addr string, name string) {
+}
 
-	eps := params.([]string)
-	if len(eps) == 0 {
-		eps = []string{"127.0.0.1:2379"}
-	}
-
-	var e error
-	if c.cc, e = api.New(api.Config{
-		Endpoints:   eps,
-		DialTimeout: time.Second * 3,
-	}); e != nil {
-		panic(e)
-	}
+func (c *conn) SetSvc(name string, service string) {
 }
 
 func (c *conn) Get(key string) map[string]svc.Value {

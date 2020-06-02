@@ -57,3 +57,9 @@ func Get(name string) Service {
 	defer mtx.Unlock()
 	return msvc[name]
 }
+
+func New(name string) Service {
+	mtx.Lock()
+	defer mtx.Unlock()
+	return msvc[name]
+}

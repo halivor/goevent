@@ -48,12 +48,17 @@ func (c *conn) Call(srv, service string, req, rsp proto.Message) ce.Errno {
 					return en
 				}
 				proto.Unmarshal(v.GetBody(), rsp)
+				return ce.SUCC
 			case error:
 				if v != nil {
-					return ce.SRV_ERR
+					goto CONTINUE
 				}
+			default:
+				// TODO: WARNING
+				return ce.BAD_REQ
 			}
 		}
+	CONTINUE:
 	}
 	return ce.SUCC
 }

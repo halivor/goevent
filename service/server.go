@@ -13,7 +13,7 @@ type http struct {
 type server struct {
 	// TODO: 增加接口调用超时
 	Key       string                     `json:"key"`
-	Service   string                     `json:"module"`
+	Service   string                     `json:"service"`
 	Host      string                     `json:"host"`
 	Type      string                     `json:"type"`
 	Interface map[string]json.RawMessage `json:"interface"`

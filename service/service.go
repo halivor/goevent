@@ -37,6 +37,7 @@ type Service interface {
 	SignUp(Server)
 	NewClnt(Server, interface{})
 	Call(string, string, proto.Message, proto.Message) ce.Errno
+	InCall(string, string, *cp.Request, proto.Message) ce.Errno
 }
 
 var (

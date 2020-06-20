@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	cp "github.com/halivor/common/golang/packet"
 	ce "github.com/halivor/common/golang/util/errno"
 	svc "github.com/halivor/goutil/service"
 	"github.com/hashicorp/consul/api"
@@ -120,7 +121,10 @@ func (c *Consul) getIdx(key string) uint64 {
 
 func (c *Consul) SetUp(name string, m svc.Method) {
 }
-func (c *Consul) Call(name string, req proto.Message, rsp proto.Message) ce.Errno {
+func (c *Consul) Call(service, name string, req proto.Message, rsp proto.Message) ce.Errno {
+	return ce.SUCC
+}
+func (c *Consul) InCall(service, name string, req *cp.Request, rsp proto.Message) ce.Errno {
 	return ce.SUCC
 }
 func (c *Consul) SignUp(svc.Server) {

@@ -1,6 +1,7 @@
 package consul
 
 import (
+	svc "github.com/halivor/goutil/service"
 	"github.com/hashicorp/consul/api"
 )
 
@@ -14,4 +15,7 @@ func (c *Consul) AddService() {
 		Meta:              c.Meta,
 		EnableTagOverride: false,
 	})
+}
+
+func (c *Consul) NewClnt(svc.Server, interface{}) {
 }

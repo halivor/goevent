@@ -44,60 +44,52 @@ func (l *logger) SetFlags(flag int) {
 }
 
 func (l *logger) Raw(v ...interface{}) {
-	if TRACE < l.level {
-		return
-	}
-
-	s := fmt.Sprintln(v...)
-	if len(s) == 0 || s[len(s)-1] != '\n' {
-		s += "\n"
+	if TRACE >= l.level && l != nil {
+		s := fmt.Sprintln(v...)
+		if len(s) == 0 || s[len(s)-1] != '\n' {
+			s += "\n"
+		}
 	}
 	//chNl <- &nlogs{w: l.Writer, data: []byte(s)}
 }
 
 func (l *logger) Println(v ...interface{}) {
-	if TRACE < l.level {
-		return
+	if TRACE >= l.level && l != nil {
+		l.Output("P ", fmt.Sprintln(v...))
 	}
-	l.Output("P ", fmt.Sprintln(v...))
 }
 
 func (l *logger) Trace(v ...interface{}) {
-	if TRACE < l.level {
-		return
+	if TRACE >= l.level && l == nil {
+		l.Output("T ", fmt.Sprintln(v...))
 	}
-	l.Output("T ", fmt.Sprintln(v...))
 }
 
 func (l *logger) Debug(v ...interface{}) {
-	if DEBUG < l.level {
-		return
+	if DEBUG >= l.level && l != nil {
+		l.Output("D ", fmt.Sprintln(v...))
 	}
-	l.Output("D ", fmt.Sprintln(v...))
 }
 
 func (l *logger) Info(v ...interface{}) {
-	if INFO < l.level {
-		return
+	if INFO >= l.level && l != nil {
+		l.Output("I ", fmt.Sprintln(v...))
 	}
-	l.Output("I ", fmt.Sprintln(v...))
 }
 
 func (l *logger) Warn(v ...interface{}) {
-	if WARN < l.level {
-		return
+	if WARN >= l.level && l != nil {
+		l.Output("W ", fmt.Sprintln(v...))
+		l.Flush()
 	}
-	l.Output("W ", fmt.Sprintln(v...))
-	l.Flush()
 }
 
 func (l *logger) Panic(v ...interface{}) {
-	if WARN < l.level {
-		return
+	if WARN >= l.level && l != nil {
+		l.Output("P ", fmt.Sprintln(v...))
+		l.FlushAll()
+		panic(v)
 	}
-	l.Output("P ", fmt.Sprintln(v...))
-	l.FlushAll()
-	panic(v)
 }
 
 func (l *logger) Flush() {

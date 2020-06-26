@@ -54,21 +54,18 @@ func (c *conn) Call(service, api string, req, rsp proto.Message) ce.Errno {
 				proto.Unmarshal(v.GetBody(), rsp)
 				return ce.SUCC
 			case error:
-				if v != nil {
-					goto CONTINUE
-				}
+				return ce.SRV_ERR
 			default:
 				// TODO: WARNING
 				return ce.BAD_REQ
 			}
 		}
-	CONTINUE:
 	}
 	return ce.SUCC
 }
 
 func (c *conn) InCall(service, api string, req *cp.Request, rsp proto.Message) ce.Errno {
-	//fmt.Println("call service", service)
+	//fmt.Println("in call service", service)
 	if _, ok := c.mcs[service]; !ok {
 		//fmt.Println("service", service, "not found")
 		return ce.SRV_ERR

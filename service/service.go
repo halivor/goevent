@@ -4,24 +4,10 @@ import (
 	"context"
 	"sync"
 
+	cp "co.mplat.com/packet"
+	ce "co.mplat.com/util/errno"
 	"github.com/golang/protobuf/proto"
-	cp "github.com/halivor/common/golang/packet"
-	ce "github.com/halivor/common/golang/util/errno"
 	"google.golang.org/grpc"
-)
-
-type EventType int32
-
-type Value interface {
-	Event() EventType
-	Data() []byte
-	String() string
-}
-
-const (
-	EVENT_ADD EventType = 1 << iota
-	EVENT_MOD
-	EVENT_DEL
 )
 
 // TODO: method to interface, when call to conver http/grpc call
@@ -36,7 +22,7 @@ type Service interface {
 	Unlock(key string)
 	SignUp(Server)
 	NewClnt(Server, interface{})
-	Call(string, string, proto.Message, proto.Message) ce.Errno
+	Call(string, string, int64, proto.Message, proto.Message) ce.Errno
 	InCall(string, string, *cp.Request, proto.Message) ce.Errno
 }
 

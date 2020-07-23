@@ -7,8 +7,6 @@ import (
 	"time"
 
 	_ "github.com/golang/protobuf/proto"
-	_ "github.com/halivor/common/golang/packet"
-	_ "github.com/halivor/common/golang/util/errno"
 	svc "github.com/halivor/goutil/service"
 	api "go.etcd.io/etcd/clientv3"
 	apicc "go.etcd.io/etcd/clientv3/concurrency"
@@ -19,7 +17,6 @@ type conn struct {
 	rw  sync.RWMutex
 	mtx map[string]*apicc.Mutex
 	mms map[string]svc.Method
-	mec map[string]*svc.Entry
 	mcs map[string]map[*svc.Client]struct{}
 }
 
@@ -31,7 +28,6 @@ func New() svc.Service {
 	return &conn{
 		mtx: map[string]*apicc.Mutex{},
 		mms: make(map[string]svc.Method, 64),
-		mec: make(map[string]*svc.Entry, 64),
 		mcs: make(map[string]map[*svc.Client]struct{}, 32),
 	}
 }

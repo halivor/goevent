@@ -2,12 +2,12 @@ package etcd
 
 import (
 	"context"
-	_ "fmt"
+	"fmt"
 	"reflect"
 
+	cp "co.mplat.com/packet"
+	ce "co.mplat.com/util/errno"
 	"github.com/golang/protobuf/proto"
-	cp "github.com/halivor/common/golang/packet"
-	ce "github.com/halivor/common/golang/util/errno"
 	svc "github.com/halivor/goutil/service"
 )
 
@@ -33,19 +33,24 @@ func (c *conn) NewClnt(srv svc.Server, ptr interface{}) {
 	c.mcs[service][nclnt] = struct{}{}
 }
 
-func (c *conn) Call(service, api string, req, rsp proto.Message) ce.Errno {
+func (c *conn) Call(service, api string, uid int64, req, rsp proto.Message) ce.Errno {
 	//fmt.Println("call service", service)
 	if _, ok := c.mcs[service]; !ok {
-		//fmt.Println("service", service, "not found")
+		fmt.Println("service", service, "not found")
 		return ce.SRV_ERR
 	}
 	for clnt, _ := range c.mcs[service] {
-		rets := reflect.ValueOf(clnt.This).MethodByName(api).
-			Call([]reflect.Value{
-				reflect.ValueOf(context.TODO()),
-				reflect.ValueOf(cp.NewRequest(req)),
-			})
+		call := reflect.ValueOf(clnt.This).MethodByName(api)
+		if !call.IsValid() {
+			return ce.NO_SRV_ERR
+		}
+		rets := call.Call([]reflect.Value{
+			reflect.ValueOf(context.TODO()),
+			reflect.ValueOf(cp.NewRequest(uid, req)),
+		})
+
 		for _, ret := range rets {
+			// TODO: 确认各种error信息
 			switch v := ret.Interface().(type) {
 			case *cp.Response:
 				if en := ce.Errno(v.GetErrno()); en != ce.SUCC {
@@ -54,12 +59,15 @@ func (c *conn) Call(service, api string, req, rsp proto.Message) ce.Errno {
 				proto.Unmarshal(v.GetBody(), rsp)
 				return ce.SUCC
 			case error:
-				return ce.SRV_ERR
+				if v != nil {
+					fmt.Println("call failed", v)
+					return ce.SRV_ERR
+				}
 			default:
-				// TODO: WARNING
 				return ce.BAD_REQ
 			}
 		}
+		return ce.SUCC
 	}
 	return ce.SUCC
 }
@@ -67,15 +75,18 @@ func (c *conn) Call(service, api string, req, rsp proto.Message) ce.Errno {
 func (c *conn) InCall(service, api string, req *cp.Request, rsp proto.Message) ce.Errno {
 	//fmt.Println("in call service", service)
 	if _, ok := c.mcs[service]; !ok {
-		//fmt.Println("service", service, "not found")
+		fmt.Println("service", service, "not found")
 		return ce.SRV_ERR
 	}
 	for clnt, _ := range c.mcs[service] {
-		rets := reflect.ValueOf(clnt.This).MethodByName(api).
-			Call([]reflect.Value{
-				reflect.ValueOf(context.TODO()),
-				reflect.ValueOf(req),
-			})
+		call := reflect.ValueOf(clnt.This).MethodByName(api)
+		if !call.IsValid() {
+			return ce.NO_SRV_ERR
+		}
+		rets := call.Call([]reflect.Value{
+			reflect.ValueOf(context.TODO()),
+			reflect.ValueOf(req),
+		})
 		for _, ret := range rets {
 			switch v := ret.Interface().(type) {
 			case *cp.Response:
@@ -86,14 +97,13 @@ func (c *conn) InCall(service, api string, req *cp.Request, rsp proto.Message) c
 				return ce.SUCC
 			case error:
 				if v != nil {
-					goto CONTINUE
+					fmt.Println("in call failed", v)
+					return ce.SRV_ERR
 				}
 			default:
-				// TODO: WARNING
 				return ce.BAD_REQ
 			}
 		}
-	CONTINUE:
 	}
 	return ce.SUCC
 }

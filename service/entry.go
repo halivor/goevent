@@ -3,9 +3,9 @@ package service
 import (
 	"context"
 
+	cp "co.mplat.com/packet"
+	ce "co.mplat.com/util/errno"
 	"github.com/golang/protobuf/proto"
-	cp "github.com/halivor/common/golang/packet"
-	ce "github.com/halivor/common/golang/util/errno"
 )
 
 type Entry struct {
@@ -24,7 +24,7 @@ func (e *Entry) Call(ctx context.Context, name string, params []interface{}) (en
 		}
 		req := params[0].(proto.Message)
 		rsp := params[1].(proto.Message)
-		rst, er := e.Grpc(ctx, cp.NewRequest(req))
+		rst, er := e.Grpc(ctx, cp.NewRequest(0, req))
 		if er != nil {
 			return ce.SRV_ERR
 		}

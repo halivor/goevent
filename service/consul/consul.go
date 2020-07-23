@@ -4,9 +4,9 @@ import (
 	"sync"
 	"time"
 
+	cp "co.mplat.com/packet"
+	ce "co.mplat.com/util/errno"
 	"github.com/golang/protobuf/proto"
-	cp "github.com/halivor/common/golang/packet"
-	ce "github.com/halivor/common/golang/util/errno"
 	svc "github.com/halivor/goutil/service"
 	"github.com/hashicorp/consul/api"
 )
